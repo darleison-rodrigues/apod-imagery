@@ -1,6 +1,10 @@
-# apod-imagery
+# APOD Image Detective: Cloudflare-Powered Architecture
 
-## Architecture Overview
+This document outlines the proposed architecture for the APOD Image Detective application, leveraging Cloudflare's edge computing and data storage services. The focus is on semantic search and data visualization, excluding interactive chat functionalities for initial feasibility.
+
+## 1. Overall System Architecture
+
+The system is designed as a serverless, edge-first application to ensure low-latency access and scalability.
 
 ```mermaid
 graph TD
@@ -24,72 +28,12 @@ graph TD
 *   **React Frontend:** The client-side application where users interact with the semantic search and visualizations.
 *   **Cloudflare Workers (API Gateway):** Acts as the backend for the frontend, receiving search queries, querying Vectorize and Images, and returning structured data to the React app.
 
-## Model Evaluation and Benchmarking
-
-To ensure both accuracy and performance, this project includes a comprehensive evaluation pipeline to compare different classification models. The goal is to measure the impact of optimization techniques (like quantization) and compare text-based models against more advanced multimodal (text + image) models.
-
-```mermaid
-graph TD
-    subgraph "1. Ground Truth Creation"
-        A[1. Select 200 Random Titles from apod.csv] --> B[2. Manually Assign Correct Category];
-        B --> C[3. Create ground_truth.csv];
-        C --> D[4. Download Corresponding Images];
-    end
-
-    subgraph "2. Model Evaluation"
-        E[Legacy BART Model (Text, FP32)]
-        F[Quantized BART Model (Text, FP16)]
-        G[CLIP Model (Image + Text)]
-    end
-
-    subgraph "3. Metrics Calculation"
-        H["Top-1 Accuracy"]
-        I["Top-3 Accuracy"]
-        J["Mean Reciprocal Rank (MRR)"]
-        K["Performance (Time/item)"]
-    end
-
-    C --> E;
-    C --> F;
-    D --> G;
-
-    E --> H; E --> I; E --> J; E --> K;
-    F --> H; F --> I; F --> J; F --> K;
-    G --> H; G --> I; G --> J; G --> K;
-
-    K --> L((Final Report));
-    J --> L;
-    I --> L;
-    H --> L;
-```
-
-**Evaluation Workflow:**
-
-1.  **Ground Truth Creation:**
-    *   A random subset of APOD entries is selected.
-    *   Each entry is manually assigned a "golden" category, creating a reliable `ground_truth.csv` file.
-    *   The actual images for these ground truth entries are downloaded for multimodal analysis.
-
-2.  **Model Comparison:**
-    *   **Legacy BART:** The original, full-precision (`float32`) text-based classifier (`facebook/bart-large-mnli`).
-    *   **Quantized BART:** The optimized, half-precision (`float16`) version of the same text-based model.
-    *   **CLIP Model:** A state-of-the-art multimodal model that uses both the image and the text to make a prediction.
-
-3.  **Metrics:**
-    *   **Accuracy:** We use standard ranking metrics to evaluate how well each model predicts the correct category.
-        *   **Top-N Accuracy:** Is the correct answer in the top 1 or top 3 predictions?
-        *   **Mean Reciprocal Rank (MRR):** How high up the list is the correct answer, on average?
-    *   **Performance:** We measure the processing speed (time per item) to quantify the efficiency gains from quantization.
-
-This process provides a clear, data-driven comparison to select the best model that balances accuracy and performance for the application's needs.
-
-
-## Data Ingestion and Processing Pipeline
+## 2. Data Ingestion and Processing Pipeline
 
 This pipeline is responsible for populating Cloudflare Vectorize and Cloudflare Images with APOD data, driven by your local Python scripts.
 
 ```mermaid
-graph TD
+igraph TD
     A[APOD NASA API] --> B{Python Script  Scheduled Worker}
     B --> C[Extract Title, Explanation, Image URL]
     C --> D[Generate Embeddings SentenceTransformers]
@@ -107,9 +51,7 @@ graph TD
 *   **Cloudflare Vectorize API:** The API endpoint used to insert these embeddings into Vectorize.
 *   **Image Download & Upload:** Fetches the actual image file and uploads it to Cloudflare Images.
 
-
-
-## Frontend Interaction and Visualization Flow
+## 3. Frontend Interaction and Visualization Flow
 
 This diagram illustrates how the React frontend interacts with the Cloudflare backend to perform semantic searches and display visualizations.
 
@@ -135,28 +77,4 @@ graph TD
 *   **D3.js / Anime.js Visualizations:** The React app uses these libraries to render interactive visualizations (e.g., t-SNE plot, image timelines) based on the received data.
 *   **Display Categorized Data:** Presents the categorized APOD entries in a user-friendly format.
 
-## Data Ingestion and Processing Pipeline
-
-This pipeline is responsible for populating Cloudflare Vectorize and Cloudflare Images with APOD data, driven by your local Python scripts.
-
-```mermaid
-graph TD
-    A[APOD NASA API] --> B{Python Script  Scheduled Worker}
-    B --> C[Extract Title, Explanation, Image URL]
-    C --> D[Generate Embeddings SentenceTransformers]
-    D --> E(Cloudflare Vectorize API)
-    C --> F[Download Image]
-    F --> G(Cloudflare Images API)
-    E -- Store Embeddings --> CloudflareVectorize[Cloudflare Vectorize]
-    G -- Upload Image --> CloudflareImages[Cloudflare Images]
-```
-
-**Explanation:**
-*   **Python Script:** Your local Python scripts (e.g., `process_apod.py` and `categorize_and_download.py`) that fetch APOD data.
-*   **Extraction:** Parses the APOD data to get the title, explanation, and image URL.
-*   **Embedding Generation:** Uses a pre-trained model (e.g., `all-MiniLM-L6-v2`) to create vector embeddings from the combined title and explanation.
-*   **Cloudflare Vectorize API:** The API endpoint used to insert these embeddings into Vectorize.
-*   **Image Download & Upload:** Fetches the actual image file and uploads it to Cloudflare Images.
-
-
-
+This architecture provides a robust, scalable, and performant solution by leveraging Cloudflare's global network and specialized services.
