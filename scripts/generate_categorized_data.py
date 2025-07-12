@@ -5,16 +5,15 @@ import torch
 from fastclassifier import FastClassifier
 from metrics import get_comprehensive_gpu_metrics
 
-# Define the categories for classification (from fastclassifier.py)
+# Define the categories for classification (from plan.txt)
 APOD_LABELS = [
-    "galaxy", "nebula", "star", "planet", "solar system",
-    "constellation", "asteroid", "comet", "spacecraft",
-    "telescope view", "aurora", "eclipse", "moon"
+    "Galaxy", "Nebula", "Star Cluster", "Planet", "Comet", "Asteroid", "Supernova", "Black Hole", "Dark Matter", "Cosmology", "Aurora", "Rocket Launch", "Satellite", "Mars Rover", "Sun", "Moon", "Earth/Atmospheric", "Solar", "Lunar", "Human Activity", "Diagram/Illustration", "Composite/Technical"
 ]
 
 def categorize_data(input_csv, output_csv):
     """
-    Reads APOD data, categorizes each title, and saves the result to a new CSV.
+    Reads APOD data, categorizes each entry using combined title and explanation,
+    and saves the result to a new CSV with confidence scores.
     """
     print("Initializing FastClassifier (embedding method)...")
     
@@ -39,11 +38,12 @@ def categorize_data(input_csv, output_csv):
     with open(input_csv, 'r', newline='', encoding='utf-8') as f_in:
         reader = csv.DictReader(f_in)
         data = list(reader)
-        titles = [row['title'] for row in data]
+        # Combine title and explanation for classification
+        texts_to_classify = [f"{row.get('title', '')}. {row.get('explanation', '')}" for row in data]
 
-    print(f"Found {len(titles)} titles. Starting classification...")
+    print(f"Found {len(texts_to_classify)} entries. Starting classification...")
     start_time = time.time()
-    classified_categories = classifier.classify_batch(titles, APOD_LABELS)
+    classified_results = classifier.classify_batch(texts_to_classify, APOD_LABELS)
     end_time = time.time()
     duration = end_time - start_time
     print("Classification complete.")
@@ -52,13 +52,20 @@ def categorize_data(input_csv, output_csv):
     if torch.cuda.is_available():
         gpu_metrics_end = get_comprehensive_gpu_metrics(device)
 
-    # Add the category to each data row
+    # Add the category and confidence to each data row
     for i, row in enumerate(data):
-        row['category'] = classified_categories[i]['labels'][0]
+        # classified_results[i] is expected to be a dictionary like {'labels': [...], 'scores': [...]}
+        if classified_results[i]['labels']:
+            row['predicted_category'] = classified_results[i]['labels'][0]
+            row['confidence_score'] = classified_results[i]['scores'][0]
+        else:
+            row['predicted_category'] = 'Uncategorized'
+            row['confidence_score'] = 0.0
 
     print(f"Writing categorized data to {output_csv}...")
     with open(output_csv, 'w', newline='', encoding='utf-8') as f_out:
-        fieldnames = ['date', 'title', 'category']
+        # Include 'explanation' and new fields in fieldnames
+        fieldnames = ['date', 'title', 'explanation', 'url', 'hdurl', 'media_type', 'copyright', 'predicted_category', 'confidence_score']
         writer = csv.DictWriter(f_out, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(data)
@@ -84,4 +91,4 @@ def categorize_data(input_csv, output_csv):
     print("Processing complete.")
 
 if __name__ == '__main__':
-    categorize_data('data/apod.csv', 'data/apod_categorized.csv')
+    categorize_data('data/apod_master_data.csv', 'data/apod_broad_categorization.csv')

@@ -4,10 +4,10 @@
 
 ```mermaid
 graph TD
-    A[APOD Source (NASA API/Scrape)] --> B(Data Ingestion Pipeline - Python Scripts)
+    A[APOD Source (NASA API)] --> B(Data Ingestion Pipeline - Python Scripts)
     B --> C(Cloudflare Vectorize: Embeddings DB)
     B --> D(Cloudflare Images: Image Storage)
-    E[React Frontend] --> F(Cloudflare Workers: API Gateway)
+    E[React Frontend (Cloudflare Pages)] --> F(Cloudflare Workers: API Gateway)
     F --> C
     F --> D
     C -- Embeddings --> F
@@ -17,11 +17,11 @@ graph TD
 ```
 
 **Explanation:**
-*   **APOD Source:** The original source of APOD data (NASA API or web scraping).
-*   **Data Ingestion Pipeline (Python Scripts):** Your local Python scripts that fetch new APOD data, extract relevant information (title, explanation, image URL), generate embeddings, and upload images to Cloudflare services.
+*   **APOD Source:** The original source of APOD data (NASA API).
+*   **Data Ingestion Pipeline (Python Scripts):** Your local Python scripts that fetch new APOD data, extract relevant information (title, explanation, image URL), generate embeddings, and prepare data for Cloudflare services.
 *   **Cloudflare Vectorize:** Stores the vector embeddings of APOD titles/explanations, enabling fast semantic similarity searches.
-*   **Cloudflare Images:** Stores and optimizes all APOD images, serving them efficiently via CDN.
-*   **React Frontend:** The client-side application where users interact with the semantic search and visualizations.
+*   **Cloudflare Images:** Stores and optimizes all APOD images, serving them efficiently via CDN for the web application.
+*   **React Frontend (Cloudflare Pages):** The client-side application, deployed on Cloudflare Pages, where users interact with the semantic search and visualizations.
 *   **Cloudflare Workers (API Gateway):** Acts as the backend for the frontend, receiving search queries, querying Vectorize and Images, and returning structured data to the React app.
 
 ## Model Evaluation and Benchmarking
@@ -37,16 +37,16 @@ graph TD
     end
 
     subgraph "2. Model Evaluation"
-        E[Legacy BART Model (Text, FP32)]
-        F[Quantized BART Model (Text, FP16)]
-        G[CLIP Model (Image + Text)]
+        E[Legacy BART Model Text FP32]
+        F[Quantized BART Model Model Text FP16]
+        G[CLIP Model Image and Text]
     end
 
     subgraph "3. Metrics Calculation"
         H["Top-1 Accuracy"]
         I["Top-3 Accuracy"]
         J["Mean Reciprocal Rank (MRR)"]
-        K["Performance (Time/item)"]
+        K["Performance Time per Item"]
     end
 
     C --> E;
@@ -86,77 +86,56 @@ This process provides a clear, data-driven comparison to select the best model t
 
 ## Data Ingestion and Processing Pipeline
 
-This pipeline is responsible for populating Cloudflare Vectorize and Cloudflare Images with APOD data, driven by your local Python scripts.
+This pipeline is responsible for fetching APOD data, generating embeddings, and preparing images for the Cloudflare-based web application.
 
 ```mermaid
 graph TD
-    A[APOD NASA API] --> B{Python Script  Scheduled Worker}
-    B --> C[Extract Title, Explanation, Image URL]
-    C --> D[Generate Embeddings SentenceTransformers]
-    D --> E(Cloudflare Vectorize API)
-    C --> F[Download Image]
-    F --> G(Cloudflare Images API)
-    E -- Store Embeddings --> CloudflareVectorize[Cloudflare Vectorize]
-    G -- Upload Image --> CloudflareImages[Cloudflare Images]
+    A[APOD NASA API] --> B{Python Script: process_apod.py}
+    B --> C[Extract Title, Explanation, Image URL, Metadata]
+    C --> D[Local Storage: apod_master_data.csv (Full Metadata)]
+    D --> E{Python Script: download_all_images.py (for local analysis/evaluation)}
+    E --> F[Local Storage: images/ (Actual Image Files)]
+    D --> G{Python Script: upload_to_cloudflare_images.py (for web app serving)}
+    G --> H(Cloudflare Images API)
+    D --> I[Python Script: generate_embeddings.py (for web app search)]
+    I --> J(Cloudflare Vectorize API)
 ```
 
 **Explanation:**
-*   **Python Script:** Your local Python scripts (e.g., `process_apod.py` and `categorize_and_download.py`) that fetch APOD data.
-*   **Extraction:** Parses the APOD data to get the title, explanation, and image URL.
-*   **Embedding Generation:** Uses a pre-trained model (e.g., `all-MiniLM-L6-v2`) to create vector embeddings from the combined title and explanation.
-*   **Cloudflare Vectorize API:** The API endpoint used to insert these embeddings into Vectorize.
-*   **Image Download & Upload:** Fetches the actual image file and uploads it to Cloudflare Images.
-
-
+*   **Python Script (`process_apod.py`):** Fetches APOD data from the NASA API, including title, explanation, image URLs, and other metadata. It's designed to be robust with rate-limiting and resumable.
+*   **Local Storage (`apod_master_data.csv`):** A comprehensive CSV file storing all fetched metadata. This serves as the single source of truth for all APOD entries.
+*   **Python Script (`download_all_images.py`):** Reads `apod_master_data.csv` and downloads the actual image files to a local `images/` directory. This is primarily for local analysis, multimodal model evaluation, and development purposes.
+*   **Python Script (`upload_to_cloudflare_images.py`):** This *future* script will read `apod_master_data.csv` and intelligently upload images to Cloudflare Images for serving via the web application. This script will handle copyright considerations by only uploading public domain images or hotlinking to NASA's URLs where appropriate.
+*   **Python Script (`generate_embeddings.py`):** This *future* script will read `apod_master_data.csv`, generate various types of embeddings (title-only, text-enriched, multimodal), and push them to Cloudflare Vectorize.
+*   **Cloudflare Images:** Stores and optimizes images for global delivery to the web application.
+*   **Cloudflare Vectorize:** Stores vector embeddings, enabling efficient semantic similarity searches for the web application.
 
 ## Frontend Interaction and Visualization Flow
 
-This diagram illustrates how the React frontend interacts with the Cloudflare backend to perform semantic searches and display visualizations.
+This diagram illustrates how the React frontend (deployed on Cloudflare Pages) interacts with the Cloudflare backend (Workers, Vectorize, Images) to perform semantic searches and display visualizations.
 
 ```mermaid
 graph TD
-    A[React Frontend] --> B{User Search Query}
-    B --> C(Cloudflare Worker Search API)
+    A[React Frontend (Cloudflare Pages)] --> B{User Search Query / Timeline Interaction}
+    B --> C(Cloudflare Worker API Gateway)
     C --> D(Cloudflare Vectorize Query Embeddings)
+    C --> E(Cloudflare Images Get Image URLs)
     D -- Top K Results (IDs) --> C
-    C --> E(Cloudflare Images: Get Image URLs)
     E -- Image URLs --> C
     C -- Combined Data (JSON) --> A
     A --> F[D3.js  Anime.js Visualizations]
-    A --> G[Display Categorized Data]
+    A --> G[Display Categorized Data / APOD Details]
 ```
 
 **Explanation:**
-*   **User Search Query:** The user types a query into the React app's search bar.
-*   **Cloudflare Worker (Search API):** This Worker receives the user's query, generates an embedding for it, queries Cloudflare Vectorize for similar APOD entries, retrieves corresponding image URLs from Cloudflare Images, and combines this data.
-*   **Cloudflare Vectorize (Query):** Performs the semantic similarity search.
-*   **Cloudflare Images (Get Image URLs):** Retrieves the optimized image URLs based on the IDs returned by Vectorize.
-*   **Combined Data (JSON):** The Worker sends a JSON response containing the search results (titles, explanations, image URLs, categories, etc.) back to the frontend.
-*   **D3.js / Anime.js Visualizations:** The React app uses these libraries to render interactive visualizations (e.g., t-SNE plot, image timelines) based on the received data.
-*   **Display Categorized Data:** Presents the categorized APOD entries in a user-friendly format.
-
-## Data Ingestion and Processing Pipeline
-
-This pipeline is responsible for populating Cloudflare Vectorize and Cloudflare Images with APOD data, driven by your local Python scripts.
-
-```mermaid
-graph TD
-    A[APOD NASA API] --> B{Python Script  Scheduled Worker}
-    B --> C[Extract Title, Explanation, Image URL]
-    C --> D[Generate Embeddings SentenceTransformers]
-    D --> E(Cloudflare Vectorize API)
-    C --> F[Download Image]
-    F --> G(Cloudflare Images API)
-    E -- Store Embeddings --> CloudflareVectorize[Cloudflare Vectorize]
-    G -- Upload Image --> CloudflareImages[Cloudflare Images]
-```
-
-**Explanation:**
-*   **Python Script:** Your local Python scripts (e.g., `process_apod.py` and `categorize_and_download.py`) that fetch APOD data.
-*   **Extraction:** Parses the APOD data to get the title, explanation, and image URL.
-*   **Embedding Generation:** Uses a pre-trained model (e.g., `all-MiniLM-L6-v2`) to create vector embeddings from the combined title and explanation.
-*   **Cloudflare Vectorize API:** The API endpoint used to insert these embeddings into Vectorize.
-*   **Image Download & Upload:** Fetches the actual image file and uploads it to Cloudflare Images.
+*   **React Frontend (Cloudflare Pages):** The client-side application, deployed on Cloudflare Pages, handles user interaction and renders the UI.
+*   **User Search Query / Timeline Interaction:** User actions trigger requests to the backend.
+*   **Cloudflare Worker API Gateway:** This serverless function acts as the central API. It receives requests, orchestrates data retrieval from Vectorize and Images, and prepares responses for the frontend.
+*   **Cloudflare Vectorize (Query Embeddings):** Performs semantic similarity searches based on user queries.
+*   **Cloudflare Images (Get Image URLs):** Provides optimized image URLs for display.
+*   **Combined Data (JSON):** The Worker sends a JSON response containing search results, timeline data, or specific APOD details (title, explanation, image URL, copyright) back to the frontend.
+*   **D3.js / Anime.js Visualizations:** The React app uses these libraries to render interactive visualizations, including the circular timeline.
+*   **Display Categorized Data / APOD Details:** Presents the fetched APOD entries and their details to the user.
 
 
 
