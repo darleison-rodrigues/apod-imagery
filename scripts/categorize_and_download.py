@@ -107,7 +107,7 @@ if __name__ == '__main__':
             date = item['date']
             
             # Categorize the title
-            category = categorize_title(title)
+            category = categorize_text(title)
             
             if category == selected_category:
                 print(f"Found a match: '{title}' in category '{category}'")

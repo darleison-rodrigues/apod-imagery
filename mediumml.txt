@@ -1,0 +1,94 @@
+---
+
+Mapping the Cosmos: A Data-Driven Journey Through NASA's APOD Archive
+A technical deep-dive into transforming 25+ years of NASA's Astronomy Picture of the Day into an interactive, searchable cosmos using multimodal embeddings space.
+Image of first March of 2014 - I really wanted to find image on a date that represented my birthday or something, but I guess, first March is more important since astronomically we would be leaving Winter. Credit: Introduction
+Back in the summer of 1995, while NASA was making headlines with the first space shuttle docking at Mir, they quietly launched something that would eventually help me write this article: the Astronomy Picture of the Day (APOD) .
+With over 9,000 entries in its archive, this dataset represents a formidable collection of astronomical imagery and explanations. 
+But here's the thing that's been bugging me about this amazing collection: it's basically a beautiful mess when it comes to actually finding what you're looking for. This is an information asymmetry problem.
+Consider the practical challenge: 
+How does one locate all images related to stellar nurseries when the term "nursery" appears nowhere in the metadata? 
+The data exists, but the means to efficiently extract and relate that information do not.
+The solution: build a high-dimensional "map" of celestial objects using embeddings - dense vectors that capture semantic meaning. Unlike sparse representations, embeddings understand relationships. "The Orion Nebula" and "Pillars of Creation" cluster together, while "A Rover on Mars" sits elsewhere.
+Concepts
+An embedding is a dense, low-dimensional vector representation of a piece of data, in this case, a sentence (the APOD title). An embedding is essentially a (set of) numerical representations of a word, indicating its meaning. We call this the Vector.
+With embeddings, we can now represent the words as vectors:
+dog: [0.2, -0.1, 0.5, …]
+cat: [0.1, -0.3, 0.4, …]
+fish: [-0.3, 0.6, -0.1, …]
+
+Each letter represents 4.14bits
+Text Embeddings: Generated for the `title` only, and for the combined `title` + `explanation`.
+Image Embeddings: Generated directly from the APOD images.
+Multimodal Embeddings: Created by concatenating the text and image embeddings, forming a unified representation that captures both modalities.
+Building the Pipeline: From Chaos to Cosmos
+Our approach can be decomposed into a series of modular, sequential steps:
+Figure 1: Pipeline diagram showing the flow from raw NASA data to explorable cosmic maps.
+The Magic of Multimodal Understanding
+
+Here's where things get fascinating. Instead of treating text and images as separate entities, I used OpenCLIP to create a shared "understanding space" where similar concepts cluster together, regardless of modality.The model generates high-dimensional vectors (think of them as cosmic coordinates) for:
+Textual descriptions - capturing the semantic meaning of astronomical explanations
+Visual features - understanding the actual appearance of celestial objects
+Fused representations - combining both modalities for complete understanding.
+Zero-Shot Classification: One step towards to machine intuition
+One of CLIP's superpowers is zero-shot classification - the ability to categorize content without explicit training.
+Data Ingestion and Parsing: The raw, line-based text from the APOD archive was systematically parsed using Python scripts to extract structured metadata - specifically, the date and title of each entry - which was then stored in a CSV file for subsequent processing. The raw APOD archive data is systematically parsed to extract structured metadata, including the date, title, detailed explanation, and image URLs. This comprehensive textual and visual data forms the foundation of our analysis.
+
+Semantic Vectorization (Embedding Generation): This is the core of our methodology. To enable computational understanding of the titles, we must convert them from human-readable text into a numerical format. This process is known as generating embeddings. This is the core of our methodology. To enable computational understanding of both the textual descriptions and the images, we convert them into a unified numerical format using a CLIP (Contrastive Language–Image Pre-training) model. Unlike traditional single-modality embeddings, CLIP learns a shared embedding space where text and images with similar meanings are located close to each other.
+To achieve this, we employed a pre-trained Sentence-BERT (SBERT) model, specifically all-MiniLM-L6-v2. This model, a variant of the powerful Transformer architecture, has been trained on an enormous corpus of text data. Through this training, it learns to map a variable-length sentence to a fixed-size (in our case, 384-dimensional) vector. The resulting vectors are normalized and positioned in the vector space such that the cosine similarity between any two vectors corresponds to the semantic similarity of their source sentences.
+We employed an OpenCLIP model (specifically, `laion/CLIP-ViT-B-32-laion2B-s34B-b79K`), an open-source re-implementation of CLIP trained on a massive dataset. This model generates high-dimensional vectors (embeddings) for both the combined `title` + `explanation` text and the corresponding image. The resulting vectors are normalized and positioned in the vector space such that the cosine similarity between any two vectors (whether text-text, image-image, or text-image) corresponds to their semantic similarity.
+CLIP-based Zero-Shot Classification: Leveraging CLIP's inherent ability to understand the relationship between text and images, we perform zero-shot classification. This technique allows us to categorize APOD entries into predefined astronomical categories without needing any pre-labeled examples for those categories. We achieve this by comparing the embeddings of the APOD entries against the embeddings of our category labels:
+CATEGORIES = ["Galaxy", "Nebula", "Star Cluster", "Planet", "Comet", "Asteroid", "Supernova", "Black Hole", "Dark Matter", "Cosmology"]
+The output of this phase is a csv file, which includes the predicted category and a confidence score for each APOD entry:
+date,title,explanation,url,hdurl,media_type,copyright,predicted_category,confidence_score
+1995-06-16,Neutron Star Earth,"Today's Picture:    Explanation:  If the Earth could somehow be transformed to the ultra-high density of a neutron star , it might appear as it does in the above computer generated figure. Due to the very strong gravitational field, the neutron star distorts light from the background sky greatly. If you look closely, two images of the constellation Orion are visible. The gravity of this particular neutron star is so great that no part of the neutron star is blocked from view - light is pulled around by gravity even from the back of the neutron star.   We keep an  archive file.  Astronomy Picture of the Day is brought to you by  Robert Nemiroff and  Jerry Bonnell . Original material on this page is copyrighted to Robert Nemiroff and Jerry Bonnell.",https://apod.nasa.gov/apod/image/e_lens.gif,https://apod.nasa.gov/apod/image/e_lens.gif,image,nan,Earth/Atmospheric,0.050452280789613724
+1995-06-20,Pleiades Star Cluster,"Today's Picture: June 20, 1995    The Pleiades Star Cluster  Picture Credit: Mount Wilson Observatory  Explanation:  The Pleiades star cluster, M45, is one of the brightest star clusters visible in the northern hemisphere. It consists of many bright, hot stars that were all formed at the same time within a large cloud of interstellar dust and gas. The blue haze that accompanies them is due to very fine dust which still remains and preferentially reflects the blue light from the stars.   We keep an archive of previous Astronomy Pictures of the Day.   Astronomy Picture of the Day is brought to you by  Robert Nemiroff and  Jerry Bonnell . Original material on this page is copyrighted to Robert J. Nemiroff and Jerry T. Bonnell.",https://apod.nasa.gov/apod/image/pleiades2.gif,https://apod.nasa.gov/apod/image/pleiades2.gif,image,nan,Star Cluster,0.06748884916305542
+1995-06-21,Supernova 1987a Aftermath,"Today's Picture: June 21, 1995    The Aftermath of the Great Supernova in 1987  Picture Credit: Hubble Space Telescope  Explanation:  In 1987 a star in one of the Milky Way's satellite galaxies exploded. In 1994 the Hubble Space Telescope, in orbit around the earth, took a very detailed picture of the remnants of this explosion. This picture, above, showed unusual and unexpected rings, and astronomers are not sure how they formed.  For more information see HST press release.  We keep an archive of previous Astronomy Pictures of the Day.   Astronomy Picture of the Day is brought to you by  Robert Nemiroff and  Jerry Bonnell . Original material on this page is copyrighted to Robert J. Nemiroff and Jerry T. Bonnell.",https://apod.nasa.gov/apod/image/sn1987a_hst.gif,https://apod.nasa.gov/apod/image/sn1987a_hst.gif,image,nan,Supernova,0.058401431888341904
+1995-06-22,Earth from Apollo 17,"In 1972 Astronauts on the United States's last lunar mission, Apollo 17, took this picture looking back at the Earth on their way to the moon. The continents of Antarctica and Africa are visible below the delicate wisps of white clouds.  For more information see NASA NSSDC press release.  We keep an archive of previous Astronomy Pictures of the Day.   The sky is filled with breathtaking pictures, many of which are available on the World Wide Web. Each day we feature a different picture of some part of our fascinating universe, along with a brief explanation written by a professional astronomer.  Astronomy Picture of the Day is brought to you by  Robert Nemiroff and  Jerry Bonnell . Original material on this page is copyrighted to Robert J. Nemiroff and Jerry T. Bonnell.",https://apod.nasa.gov/apod/image/earth_a17.gif,https://apod.nasa.gov/apod/image/earth_a17.gif,image,nan,Earth/Atmospheric,0.052926477044820786
+1995-06-23,Gamma Ray Sky Map,"What if you could ""see"" gamma rays? This computer processed image represents a map of the entire sky at photon energies above 100 million electron Volts. These gamma-ray photons are more than 40 million times more energetic than visible light photons and are blocked from the Earth's surface by the atmosphere. In the early 1990s NASA's Compton Gamma Ray Observatory, in orbit around the Earth, scanned the entire sky to produce this picture. A diffuse gamma-ray glow from the plane of our Milky Way Galaxy is clearly seen across the middle. The nature and even distance to some of the fainter sources remain unknown.  For more information see Compton Science Support Center release.   We keep an archive of previous Astronomy Pictures of the Day.   The sky is filled with breathtaking pictures, many of which are available on the World Wide Web. Each day we feature a different picture of some part of our fascinating universe, along with a brief explanation written by a professional astronomer.  Astronomy Picture of the Day is brought to you by  Robert Nemiroff and  Jerry Bonnell . Original material on this page is copyrighted to Robert J. Nemiroff and Jerry T. Bonnell.",https://apod.nasa.gov/apod/image/egret_gro.gif,https://apod.nasa.gov/apod/image/egret_gro.gif,image,nan,Cosmology,0.05210227519273758
+Vector Storage and Indexing: With over 9,000 titles, each represented by a 384-dimensional vector, efficient storage and retrieval become critical, each represented by high-dimensional vectors, efficient storage and retrieval are critical. We utilize ChromaDB, a specialized open-source vector database, to store and index these multimodal embeddings. ChromaDB is engineered for fast nearest-neighbor searches, enabling powerful semantic querying:
+Query: find images and descriptions semantically similar to 'colliding galaxies'.
+Dimensionality Reduction for Visualization: While the high-dimensional embedding space is ideal for machine computation and semantic search, it is impossible for humans to visualize directly. 
+To create our "maps," we project these embeddings into a 2D space using advanced non-linear dimensionality reduction techniques:
+t-distributed Stochastic Neighbor Embedding (t-SNE): 
+This technique is particularly well-suited for visualizing high-dimensional datasets by preserving local structures. Points that are close in the high-dimensional space remain close in the 2D projection, forming visually distinct clusters of related concepts.
+Uniform Manifold Approximation and Projection (UMAP):
+ UMAP is another powerful technique that often provides a better balance between preserving local and global data structure compared to t-SNE, and is generally faster.
+We apply these methods to each type of embedding (title, title+explanation, image, and multimodal) to generate various semantic landscapes. The resulting scatter plots are interactive, allowing users to explore clusters and individual data points, as well as more nuanced groupings that emerge organically from the data.
+Figure 1: Initial t-SNE visualization of APOD title embeddings. Each point represents an APOD title. Clusters indicate semantic similarity. This monochrome representation will be enhanced with color-coding based on astronomical categories in subsequent analyses.
+
+*(Interactive plot showing APOD entries based on title embeddings, colored by predicted category. Clusters of similar titles should be visible.)*
+**Figure 2: Title + Explanation Embeddings (UMAP) Plot**
+![Placeholder for Title + Explanation Embeddings (UMAP) Plot](https://via.placeholder.com/800x600?text=Title+%2B+Explanation+Embeddings+(UMAP)+Plot)
+*(Interactive plot showing APOD entries based on combined text embeddings, colored by predicted category. This plot should show tighter, more semantically coherent clusters.)*
+**Figure 3: Image Embeddings (t-SNE) Plot**
+![Placeholder for Image Embeddings (t-SNE) Plot](https://via.placeholder.com/800x600?text=Image+Embeddings+(t-SNE)+Plot)
+*(Interactive plot showing APOD entries based purely on visual features, colored by predicted category. Visually similar images should cluster together.)*
+*Figure 4: Multimodal Embeddings (UMAP) Plot**
+
+![Multimodal Embeddings (UMAP) Plot]
+*(Interactive plot showing APOD entries based on fused text and image embeddings, colored by predicted category. This plot represents the most comprehensive semantic map, combining both textual and visual cues.)*
+Performance Under the Hood: GPU Metrics: 
+Running large multimodal models like CLIP can be computationally intensive. We meticulously monitor GPU utilization and memory usage throughout the embedding generation and classification process. This provides crucial insights for optimization and resource management.
+We collect periodic GPU metrics, including timestamp, process, duration, GPU name, utilization percentage, and memory usage. A sample of the collected data looks like this:
+timestamp,process,duration_seconds,gpu_name,gpu_utilization_percent,gpu_memory_used_bytes,gpu_memory_total_bytes
+2025–07–11 21:06:48,clip_categorization_end,387.95539021492004,NVIDIA GeForce RTX 4070,0,2218692608,12878610432
+Results and Future Work
+The output of this pipeline is a rich, interactive visualization where each point represents an APOD entry, positioned based on its semantic similarity to others across different modalities. One can observe dense clusters corresponding to well-defined astronomical categories like nebulae, galaxies, and solar system bodies, as well as more nuanced groupings that emerge organically from the data.
+This work lays the foundation for several exciting future applications:
+Image Detective Web App: The generated embeddings and categories will be used to build an interactive web application where users can explore the APOD archive, click on an image, and see semantically similar images, powered by the vector database.
+Supervised Morphological Classification: Leveraging the human-annotated ground truth data (from Phase 2), we can build robust classifiers to automatically identify detailed morphological types of galaxies and nebulae (e.g., Spiral, Elliptical, Emission, Reflection) with high accuracy.
+
+---
+
+This project reminded me why I fell in love with both programming and astronomy. 
+What would you explore if you could navigate the universe by meaning rather than keywords? Drop your thoughts in the comments - I'd love to hear your cosmic curiosities.
+References
+[1] NASA Astronomy Picture of the Day API -  https://api.nasa.gov/
+[2] ChromaDB - The AI-native database: https://www.trychroma.com/
+[2] OpenCLIP -  https://github.com/mlfoundations/open_clip
+[3] Sentence-Transformers Library: Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks. Reimers, N., & Gurevych, I. (2019). [https://www.sbert.net/](https://www.sbert.net/)
+[4] Prediction and Entropy of Printed English. Shannon, C.E. (1951) 
+[5] UMAP: Uniform Manifold Approximation and Projection for Dimension Reduction. arXiv preprint arXiv:1802.03426. McInnes, L., Healy, J., & Melville, J. (2018).
+[5] Efficient Algorithms for t-Distributed Stochastic Neighborhood Embedding: Linderman, G.C., Rachh, M., Hoskins, J.G., Steinerberger, S., & Kluger, Y. (2019)
+[6] Visualizing Data using t-SNE: van der Maaten, L., & Hinton, G. (2008). Journal of Machine Learning Research, 9(Nov), 2579–2605.

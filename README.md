@@ -4,10 +4,10 @@
 
 ```mermaid
 graph TD
-    A[APOD Source (NASA API)] --> B(Data Ingestion Pipeline - Python Scripts)
+    A[NASA API] --> B(Data Ingestion Pipeline - Python Scripts)
     B --> C(Cloudflare Vectorize: Embeddings DB)
     B --> D(Cloudflare Images: Image Storage)
-    E[React Frontend (Cloudflare Pages)] --> F(Cloudflare Workers: API Gateway)
+    E[React Frontend] --> F(Cloudflare Workers: API Gateway)
     F --> C
     F --> D
     C -- Embeddings --> F
@@ -80,6 +80,7 @@ graph TD
         *   **Top-N Accuracy:** Is the correct answer in the top 1 or top 3 predictions?
         *   **Mean Reciprocal Rank (MRR):** How high up the list is the correct answer, on average?
     *   **Performance:** We measure the processing speed (time per item) to quantify the efficiency gains from quantization.
+    *   **GPU Metrics:** We also track GPU utilization and memory usage during the embedding generation and classification processes to monitor resource consumption and identify optimization opportunities.
 
 This process provides a clear, data-driven comparison to select the best model that balances accuracy and performance for the application's needs.
 
@@ -92,12 +93,10 @@ This pipeline is responsible for fetching APOD data, generating embeddings, and 
 graph TD
     A[APOD NASA API] --> B{Python Script: process_apod.py}
     B --> C[Extract Title, Explanation, Image URL, Metadata]
-    C --> D[Local Storage: apod_master_data.csv (Full Metadata)]
-    D --> E{Python Script: download_all_images.py (for local analysis/evaluation)}
-    E --> F[Local Storage: images/ (Actual Image Files)]
-    D --> G{Python Script: upload_to_cloudflare_images.py (for web app serving)}
-    G --> H(Cloudflare Images API)
-    D --> I[Python Script: generate_embeddings.py (for web app search)]
+    C --> D[Local Storage apod_master_data.csv ]
+    D --> E{Python Script download_all_images.py }
+    E --> F[Local Storage images]
+    D --> I[Python Script generate_embeddings.py]
     I --> J(Cloudflare Vectorize API)
 ```
 
@@ -116,7 +115,7 @@ This diagram illustrates how the React frontend (deployed on Cloudflare Pages) i
 
 ```mermaid
 graph TD
-    A[React Frontend (Cloudflare Pages)] --> B{User Search Query / Timeline Interaction}
+    A[React Frontend] --> B{User Search Query / Timeline Interaction}
     B --> C(Cloudflare Worker API Gateway)
     C --> D(Cloudflare Vectorize Query Embeddings)
     C --> E(Cloudflare Images Get Image URLs)

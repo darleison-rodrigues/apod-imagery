@@ -136,3 +136,60 @@ if __name__ == "__main__":
         for key, value in metrics.items():
             if value is not None:
                 print(f"  {key}: {value}")
+
+def calculate_top_n_accuracy(predictions, ground_truth, n=1):
+    """
+    Calculates Top-N accuracy.
+    :param predictions: List of lists, where each inner list contains predicted labels sorted by confidence.
+    :param ground_truth: List of true labels.
+    :param n: The 'N' for Top-N accuracy.
+    :return: Top-N accuracy score.
+    """
+    if len(predictions) != len(ground_truth):
+        raise ValueError("Predictions and ground truth lists must have the same length.")
+
+    correct_predictions = 0
+    for i in range(len(predictions)):
+        if ground_truth[i] in predictions[i][:n]:
+            correct_predictions += 1
+    return correct_predictions / len(predictions)
+
+def calculate_mrr(predictions, ground_truth):
+    """
+    Calculates Mean Reciprocal Rank (MRR).
+    :param predictions: List of lists, where each inner list contains predicted labels sorted by confidence.
+    :param ground_truth: List of true labels.
+    :return: MRR score.
+    """
+    if len(predictions) != len(ground_truth):
+        raise ValueError("Predictions and ground truth lists must have the same length.")
+
+    reciprocal_ranks = []
+    for i in range(len(predictions)):
+        try:
+            rank = predictions[i].index(ground_truth[i]) + 1
+            reciprocal_ranks.append(1 / rank)
+        except ValueError:  # True label not found in predictions
+            reciprocal_ranks.append(0)
+    return sum(reciprocal_ranks) / len(reciprocal_ranks)
+
+def calculate_precision_at_k(predictions, ground_truth, k=1):
+    """
+    Calculates Precision@k.
+    :param predictions: List of lists, where each inner list contains predicted labels sorted by confidence.
+    :param ground_truth: List of true labels.
+    :param k: The 'k' for Precision@k.
+    :return: Precision@k score.
+    """
+    if len(predictions) != len(ground_truth):
+        raise ValueError("Predictions and ground truth lists must have the same length.")
+
+    precision_scores = []
+    for i in range(len(predictions)):
+        relevant_in_top_k = 0
+        for j in range(min(k, len(predictions[i]))):
+            if predictions[i][j] == ground_truth[i]:
+                relevant_in_top_k = 1  # Only one true label, so it's either 1 or 0
+                break
+        precision_scores.append(relevant_in_top_k)
+    return sum(precision_scores) / len(precision_scores)

@@ -1,0 +1,105 @@
+.clock-timeline-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 30px;
+  margin-top: 50px;
+}
+
+.clock-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 400px;
+  height: 400px;
+  position: relative;
+}
+
+.clock-1 {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.3); /* Darker glass background */
+  border: 1px solid rgba(255, 255, 255, 0.1); /* Subtle glass border */
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  backdrop-filter: blur(5px);
+  -webkit-backdrop-filter: blur(5px);
+}
+
+.clock-2 {
+  position: absolute;
+  width: 75%;
+  height: 75%;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.2); /* Even darker glass background */
+  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                    radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 20px 20px;
+  background-position: 0 0, 10px 10px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.clock-2::before {
+  content: '';
+  position: absolute;
+  width: 4px;
+  height: 120px;
+  background-color: var(--accent-yellow); /* Yellow color from image */
+  transform-origin: bottom center;
+  bottom: 50%;
+  left: 50%;
+  transform: translateX(-50%) rotate(0deg);
+  border-radius: 2px;
+}
+
+.clock-2::after {
+  content: '';
+  position: absolute;
+  width: 15px;
+  height: 15px;
+  background-color: var(--accent-yellow); /* Yellow color from image */
+  border-radius: 50%;
+  z-index: 1;
+}
+
+.apod-tooltip {
+  position: absolute;
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--br-m);
+  padding: 15px 25px;
+  box-shadow: 0 8px 32px 0 var(--glass-shadow);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  text-align: center;
+  max-width: 300px;
+  z-index: 100;
+  transform: translate(-50%, -50%); /* Center the tooltip on its calculated position */
+}
+
+.apod-tooltip h3 {
+  margin: 0 0 5px 0;
+  color: #fff;
+  font-size: 1.2em;
+}
+
+.apod-tooltip h4 {
+  margin: 0 0 10px 0;
+  color: var(--accent-yellow);
+  font-size: 1em;
+}
+
+.apod-tooltip p {
+  margin: 0;
+  color: var(--text-light);
+  font-size: 0.9em;
+}
+
+.apod-tooltip img {
+  margin-top: 10px;
+  border-radius: var(--br-s);
+}

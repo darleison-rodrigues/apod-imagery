@@ -9,7 +9,7 @@ import csv
 from tqdm import tqdm
 import numpy as np
 from concurrent.futures import ThreadPoolExecutor
-from metrics import get_comprehensive_gpu_metrics  # Assuming this is available
+from metrics import get_comprehensive_gpu_metrics, calculate_top_n_accuracy, calculate_mrr, calculate_precision_at_k
 import gc
 from typing import List, Dict, Tuple, Optional
 from chroma_db_manager import ChromaDBManager # Import ChromaDBManager
@@ -177,8 +177,8 @@ def consolidate_embedding_batches(embeddings_dir: str, total_batches: int):
             os.remove(indices_file)
 
 def process_batch(batch_data: pd.DataFrame, model: CLIPModel, processor: CLIPProcessor, 
-                 category_embeddings: torch.Tensor, device: str, image_paths: Dict[int, str]) -> Tuple[List[Dict], EmbeddingBatch]:
-    """Process a batch of images and texts with all embedding types"""
+                 category_embeddings: torch.Tensor, device: str, image_paths: Dict[int, str]) -> Tuple[List[Dict], EmbeddingBatch, List[List[str]]]:
+    """Process a batch of images and texts with all embedding types and return top-k predictions"""
     batch_images = []
     batch_texts_full = []
     batch_texts_title = []
@@ -202,7 +202,7 @@ def process_batch(batch_data: pd.DataFrame, model: CLIPModel, processor: CLIPPro
         batch_indices.append(idx)
     
     if not batch_images:
-        return [], EmbeddingBatch()
+        return [], EmbeddingBatch(), []
     
     try:
         with torch.no_grad():
@@ -253,15 +253,18 @@ def process_batch(batch_data: pd.DataFrame, model: CLIPModel, processor: CLIPPro
             
             # Classification using full text features
             logits_per_text = (full_text_features @ category_embeddings.T).softmax(dim=-1)
-            top_scores, top_label_indices = logits_per_text.cpu().topk(1, dim=-1)
+            
+            # Get top-k predictions for metrics calculation
+            top_k_scores, top_k_label_indices = logits_per_text.cpu().topk(len(APOD_LABELS), dim=-1) # Get all labels for metrics
             
             # Prepare results
             results = []
             embedding_batch = EmbeddingBatch()
+            top_k_predictions_batch = []
             
             for i, idx in enumerate(batch_indices):
-                predicted_category = APOD_LABELS[top_label_indices[i].item()]
-                confidence_score = top_scores[i].item()
+                predicted_category = APOD_LABELS[top_k_label_indices[i, 0].item()]
+                confidence_score = top_k_scores[i, 0].item()
                 
                 results.append({
                     'index': idx,
@@ -277,14 +280,17 @@ def process_batch(batch_data: pd.DataFrame, model: CLIPModel, processor: CLIPPro
                     multimodal_features[i:i+1].cpu().numpy(),
                     idx
                 )
+                
+                # Store top-k predicted labels for this item
+                top_k_predictions_batch.append([APOD_LABELS[j.item()] for j in top_k_label_indices[i]])
             
-            return results, embedding_batch
+            return results, embedding_batch, top_k_predictions_batch
     
     except Exception as e:
         print(f"Error processing batch: {e}")
-        return [], EmbeddingBatch()
+        return [], EmbeddingBatch(), []
 
-def generate_clip_categorized_data():
+def generate_clip_categorized_data(ground_truth_csv="ground_truth.csv"):
     print("Loading CLIP model and processor...")
     model = CLIPModel.from_pretrained("laion/CLIP-ViT-B-32-laion2B-s34B-b79K")
     processor = CLIPProcessor.from_pretrained("laion/CLIP-ViT-B-32-laion2B-s34B-b79K")
@@ -323,6 +329,7 @@ def generate_clip_categorized_data():
         category_embeddings /= category_embeddings.norm(dim=-1, keepdim=True)
 
     results = []
+    all_top_k_predictions = [] # Store all top-k predictions for semantic metrics
     current_embedding_batch = EmbeddingBatch()
     batch_counter = 0
     start_time = time.time()
@@ -332,7 +339,7 @@ def generate_clip_categorized_data():
     
     for i in tqdm(range(0, len(df_valid), BATCH_SIZE), desc="Processing batches"):
         batch_data = df_valid.iloc[i:i+BATCH_SIZE]
-        batch_results, batch_embeddings = process_batch(
+        batch_results, batch_embeddings, top_k_predictions_batch = process_batch(
             batch_data, model, processor, category_embeddings, device, image_paths
         )
         
@@ -355,6 +362,9 @@ def generate_clip_categorized_data():
                 batch_embeddings.indices[j]
             )
         
+        # Collect all top-k predictions
+        all_top_k_predictions.extend(top_k_predictions_batch)
+
         # Save embeddings periodically to prevent memory overflow
         if len(current_embedding_batch) >= SAVE_EMBEDDINGS_EVERY:
             save_embeddings_batch(current_embedding_batch, batch_counter, EMBEDDINGS_DIR)
@@ -433,6 +443,59 @@ def generate_clip_categorized_data():
             metrics_writer.writeheader()
             metrics_writer.writerows(all_gpu_metrics)
         print(f"GPU metrics saved to {GPU_METRICS_FILE}")
+
+    # Calculate semantic metrics if ground truth is available
+    if os.path.exists(ground_truth_csv):
+        print(f"Calculating semantic metrics using {ground_truth_csv}...")
+        ground_truth_df = pd.read_csv(ground_truth_csv)
+        
+        # Convert results to DataFrame for easier merging
+        processed_df = pd.DataFrame(results)
+        
+        # Merge with ground truth to align predictions and true labels
+        # Use 'date' and 'title' for merging, assuming they are unique identifiers
+        merged_df = pd.merge(processed_df, ground_truth_df, on=['date', 'title'], how='inner')
+        
+        if not merged_df.empty:
+            true_labels = merged_df['true_category'].tolist()
+            
+            # Map all_top_k_predictions back to the order of merged_df
+            # Create a mapping from (date, title) to its corresponding top-k predictions
+            top_k_map = {}
+            for i, row in df_valid.iterrows(): # Use df_valid as it contains original indices
+                key = (row['date'], row['title'])
+                # Find the index of this row in the original df_valid to get its top-k predictions
+                original_idx = df_valid.index.get_loc(i)
+                if original_idx < len(all_top_k_predictions):
+                    top_k_map[key] = all_top_k_predictions[original_idx]
+
+            predictions_for_metrics = []
+            for _, row in merged_df.iterrows():
+                key = (row['date'], row['title'])
+                predictions_for_metrics.append(top_k_map.get(key, []))
+
+            top1_accuracy = calculate_top_n_accuracy(predictions_for_metrics, true_labels, n=1)
+            top3_accuracy = calculate_top_n_accuracy(predictions_for_metrics, true_labels, n=3)
+            mrr = calculate_mrr(predictions_for_metrics, true_labels)
+            precision_at_1 = calculate_precision_at_k(predictions_for_metrics, true_labels, k=1)
+            
+            semantic_metrics = {
+                'top1_accuracy': top1_accuracy,
+                'top3_accuracy': top3_accuracy,
+                'mrr': mrr,
+                'precision_at_1': precision_at_1
+            }
+            
+            semantic_metrics_filename = "data/semantic_metrics_clip.csv"
+            with open(semantic_metrics_filename, 'w', newline='') as f_sem_metrics:
+                writer = csv.DictWriter(f_sem_metrics, fieldnames=semantic_metrics.keys())
+                writer.writeheader()
+                writer.writerow(semantic_metrics)
+            print(f"Semantic metrics saved to {semantic_metrics_filename}")
+        else:
+            print("No matching entries found between processed data and ground truth for semantic metrics calculation.")
+    else:
+        print(f"Ground truth file {ground_truth_csv} not found. Skipping semantic metrics calculation.")
 
     # Clean up
     if device == "cuda":
