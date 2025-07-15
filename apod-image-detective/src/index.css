@@ -109,19 +109,6 @@ button:focus-visible {
   outline: 4px auto var(--accent-blue);
 }
 
-@media (min-width: 900px) {
-  :root {
-    --text-xxxxl: 4.0rem;
-    --text-xxxl: 3.25rem;
-    --text-xxl: 2.5rem;
-    --text-xl: 1.75rem;
-    --text-l: 1.25rem;
-    --text-m: 1.125rem;
-    --text-s: 1rem;
-    --text-xs: 0.875rem;
-    --text-xxs: 0.75rem;
-  }
-}
 *,
 *:before,
 *:after {

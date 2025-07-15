@@ -1,5 +1,6 @@
 .env
-# apod-image-detective
+apod-image-detective
+/data
 __pycache__/
 *.pyc
 /cloudflare-workers
