@@ -1,0 +1,7 @@
+chromadb
+fastapi
+uvicorn
+pandas
+scikit-learn
+matplotlib
+requests

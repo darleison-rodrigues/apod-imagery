@@ -4,59 +4,9 @@
 
 ## Overview
 
-This project creates an intelligent exploration platform for NASA's APOD archive, combining multiple AI models to generate semantic embeddings, analyze imagery, and deliver content through a performant web application. The system processes astronomical images and descriptions to enable semantic search, content classification, and visual discovery of space imagery.
+This project provides a suite of tools for performing machine learning tasks on NASA's Astronomy Picture of the Day (APOD) archive. It includes scripts for data processing, model training, and evaluation, with a focus on semantic search, content classification, and visual discovery of space imagery.
 
-## :sparkles: Key Features
-
-- **Semantic Search**: Vector-based search across APOD descriptions and generated image captions
-- **AI-Powered Image Analysis**: Automated description generation and object detection for astronomical images
-- **Interactive Timeline**: Visual exploration of APOD data with D3.js-powered visualizations
-- **Real-time Processing**: Live AI inference using Cloudflare's edge computing platform
-- **Model Evaluation Framework**: Comprehensive testing and validation of AI model performance
-- **Responsive Design**: Optimized experience across desktop and mobile devices
-
-## :building_blocks: Architecture
-
-### System Overview
-
-The application follows a modern serverless architecture leveraging Cloudflare's edge platform:
-
-- **Frontend**: React SPA hosted on Cloudflare Pages
-- **API Layer**: Cloudflare Workers for serverless compute
-- **Vector Database**: Cloudflare Vectorize for semantic search
-- **AI Models**: Cloudflare AI Workers for image and text processing
-- **Storage**: Cloudflare R2 for image assets
-
-### Data Flow
-
-```mermaid
-sequenceDiagram
-    participant Browser
-    participant CloudflarePages as Cloudflare Pages
-    participant ReactFrontend as React Frontend
-    participant CloudflareWorker as Cloudflare Worker (API Gateway)
-    participant CloudflareVectorize as Cloudflare Vectorize (Embeddings DB)
-    participant CloudflareAI as Cloudflare AI Workers
-
-    Browser->>CloudflarePages: Request Static Assets
-    CloudflarePages-->>Browser: Serves React App (HTML, CSS, JS)
-    Browser->>ReactFrontend: Loads React App
-    ReactFrontend->>Browser: Renders Initial UI
-
-    alt User performs Search or Timeline Interaction
-        Browser->>CloudflareWorker: 1. API Request (Search/Data Fetch)
-        CloudflareWorker->>CloudflareAI: 2. Process Query (if needed)
-        CloudflareAI-->>CloudflareWorker: 3. AI Processing Results
-        CloudflareWorker->>CloudflareVectorize: 4. Query Embeddings
-        CloudflareVectorize-->>CloudflareWorker: 5. Returns Query Results
-        CloudflareWorker-->>Browser: 6. Sends JSON Response
-        Browser->>ReactFrontend: 7. Receives JSON Data
-        ReactFrontend->>ReactFrontend: 8. Processes Data & Updates State
-        ReactFrontend->>Browser: 9. Renders Updated UI (D3.js/Anime.js Visualizations, APOD Details)
-    end
-```
-
-## :robot: AI Models & Processing Pipeline
+## :guardsman: Models & Processing Pipeline
 
 The system leverages multiple specialized AI models from Cloudflare's catalog:
 
@@ -73,125 +23,51 @@ The system leverages multiple specialized AI models from Cloudflare's catalog:
 1. **Data Ingestion**: Fetch APOD data from NASA's API
 2. **Image Analysis**: Generate captions and detect objects using vision models
 3. **Text Processing**: Create embeddings and classify content
-4. **Vector Storage**: Store embeddings in Cloudflare Vectorize
+4. **Vector Storage**: Store embeddings in ChromaDB
 5. **Search & Discovery**: Enable semantic search and content recommendations
 
-## :gear: Getting Started
+## :gear: Setup and Installation
 
 ### Prerequisites
 
-- Node.js 18+ and npm/yarn
-- Cloudflare account with Workers and Pages access
-- NASA API key (optional, for extended rate limits)
+- Python 3.8+
+- Pip
+- Virtualenv (recommended)
 
 ### Installation
 
 ```bash
 # Clone the repository
 git clone https://github.com/yourusername/apod-imagery.git
-cd apod-imagery
+cd apod-imagery/python
+
+# Create and activate a virtual environment
+virtualenv venv
+source venv/bin/activate
 
 # Install dependencies
-npm install
-
-# Set up environment variables
-cp .env.example .env
-# Edit .env with your Cloudflare credentials and API keys
-```
-
-### Development
-
-```bash
-# Start the development server
-npm run dev
-
-# Run the data processing pipeline
-npm run process-apod
-
-# Evaluate model performance
-npm run evaluate-models
-```
-
-### Deployment
-
-```bash
-# Deploy to Cloudflare
-npm run deploy
-
-# Deploy Workers
-npm run deploy:workers
-
-# Deploy frontend to Pages
-npm run deploy:pages
+pip install -r requirements.txt
 ```
 
 ## :file_folder: Project Structure
 
 ```
 apod-imagery/
-├── src/
-│   ├── components/          # React components
-│   ├── workers/            # Cloudflare Workers
-│   ├── models/             # AI model interfaces
-│   ├── utils/              # Utility functions
-│   └── styles/             # CSS and styling
-├── data/
-│   ├── processed/          # Processed APOD data
-│   └── embeddings/         # Generated vector embeddings
-├── evaluation/
-│   ├── metrics/            # Model evaluation metrics
-│   └── benchmarks/         # Performance benchmarks
-├── docs/                   # Documentation
-└── scripts/                # Data processing scripts
+├── python/
+│   ├── data/
+│   │   ├── processed/
+│   │   └── embeddings/
+│   ├── db/
+│   │   ├── chromadb_schema.py
+│   │   ├── schema_versioning.py
+│   │   └── vectorize_schema.py
+│   ├── src/
+│   │   ├── data_processing/
+│   │   ├── ml_models/
+│   │   └── utils/
+│   └── README.md
+└── workers/
+    └── apodimagery/
+        ├── index.ts
+        └── wrangler.jsonc
 ```
-
-## :chart_with_upwards_trend: Model Evaluation
-
-The project includes a comprehensive evaluation framework to assess model performance:
-
-- **Embedding Quality**: Semantic similarity and clustering metrics
-- **Classification Accuracy**: Precision, recall, and F1-scores for content categorization
-- **Image Captioning**: BLEU and ROUGE scores for generated descriptions
-- **Search Relevance**: Click-through rates and user satisfaction metrics
-
-Run evaluations with:
-```bash
-npm run evaluate --model=all
-npm run benchmark --metric=similarity
-```
-
-## :rocket: Performance
-
-- **Search Latency**: < 100ms average response time
-- **Image Processing**: < 2s for caption generation
-- **Embedding Generation**: < 500ms per document
-- **UI Responsiveness**: 60fps animations and interactions
-
-## :handshake: Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details on:
-
-- Code style and standards
-- Testing requirements
-- Pull request process
-- Model evaluation protocols
-
-## :page_facing_up: License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## :link: Links
-
-- [NASA APOD API](https://api.nasa.gov/)
-- [Cloudflare AI Documentation](https://developers.cloudflare.com/ai/)
-- [Live Demo](https://apod-imagery.pages.dev)
-
-## :star: Acknowledgments
-
-- NASA for providing the incredible APOD dataset
-- Cloudflare for their edge AI platform
-- The open-source community for the underlying ML models
-
----
-
-**Built with :heart: for space exploration and AI innovation**

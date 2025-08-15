@@ -1,0 +1,52 @@
+# .github/workflows/deploy.yml
+name: Deploy Cloudflare Worker
+
+# Controls when the workflow will run
+on:
+  push:
+    branches:
+      - main # Trigger deployment only on push to the 'main' branch
+
+# Define permissions for the GITHUB_TOKEN
+permissions:
+  contents: read      # To checkout the repository code
+  deployments: write  # To create GitHub deployments
+
+# Define a single job called 'deploy'
+jobs:
+  deploy:
+    runs-on: ubuntu-latest # Specify the runner environment
+
+    steps:
+      # Step 1: Checkout the repository code
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # Step 2: Set up Node.js environment
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # Use a stable Node.js version
+
+      # Step 3: Install project dependencies
+      - name: Install Dependencies
+        run: npm install
+
+      # Step 4: Build client assets
+      - name: Build Client Assets
+        run: npm run build:client
+
+      # Step 5: Run tests (Optional but recommended)
+      - name: Run Tests
+        run: echo "No tests configured. Add your test command here."
+
+      # Step 6: Deploy the Worker to Cloudflare's production environment
+      - name: Deploy Worker to Cloudflare
+        if: github.ref == 'refs/heads/main' # Ensure this step only runs for the main branch
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: deploy
+
+      
