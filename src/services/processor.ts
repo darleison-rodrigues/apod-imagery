@@ -27,6 +27,7 @@ export class APODProcessor {
 	 * @returns Promise<ProcessingMetrics> - Complete processing statistics
 	 */
 	async processAPODData(apodDataList: APODData[]): Promise<ProcessingMetrics> {
+		console.log(`Starting processing for ${apodDataList.length} APOD items.`);
 		this.validateInput(apodDataList);
 		
 		const batches = this.createBatches(apodDataList, this.config.batchSize);
@@ -40,7 +41,9 @@ export class APODProcessor {
 			}
 		}
 
-		return this.finalizeProcessing();
+		const finalMetrics = this.finalizeProcessing();
+		console.log('APOD processing complete.');
+		return finalMetrics;
 	}
 
 	/**
@@ -88,27 +91,34 @@ export class APODProcessor {
 	 * Processes a single APOD item through the complete pipeline
 	 * @param apodData - Individual APOD data item to process
 	 */
-	private async processSingleAPODItem(apodData: APODData): Promise<void> {
+		private async processSingleAPODItem(apodData: APODData): Promise<void> {
 		// Skip non-image media types
 		if (!this.isImageMedia(apodData)) {
+			console.log(`Skipping ${apodData.date}: Not an image media type.`);
 			this.metrics.skipped++;
 			return;
 		}
 
 		// Skip already processed items
 		if (await this.storage.isAlreadyProcessed(apodData.date)) {
+			console.log(`Skipping ${apodData.date}: Already processed.`);
 			this.metrics.skipped++;
 			return;
 		}
 
-		const imageBlob = await this.fetchImageContent(apodData.url);
-		const classificationResult = await this.ai.classifyAPOD(apodData, imageBlob);
-		
-		if (classificationResult.isRelevant) {
-			this.metrics.relevant++;
-			await this.storage.storeAPODData(apodData, classificationResult, imageBlob);
-		} else {
-			this.metrics.irrelevant++;
+		try {
+			const imageBlob = await this.fetchImageContent(apodData.url);
+			const classificationResult = await this.ai.classifyAPOD(apodData, imageBlob);
+			
+			if (classificationResult.isRelevant) {
+				this.metrics.relevant++;
+				await this.storage.storeAPODData(apodData, classificationResult, imageBlob);
+				console.log(`Successfully processed and stored ${apodData.date}.`);
+			} else {
+				this.metrics.irrelevant++;
+			}
+		} catch (error) {
+			throw error; // Re-throw to be caught by retry logic
 		}
 	}
 
