@@ -87,7 +87,7 @@ export class AIService {
 	 * Generates vector embeddings for semantic search and similarity matching
 	 * @param text - The text to embed
 	 * @returns Promise<number[]> - Vector embeddings array
-	 */	private async generateEmbeddings(text: string): Promise<number[]> {
+	 */	public async generateEmbeddings(text: string): Promise<number[]> {
 		const model = '@cf/baai/bge-base-en-v1.5';
 		
 		// Clean and optimize text for embedding generation
