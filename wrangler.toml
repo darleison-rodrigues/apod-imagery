@@ -1,5 +1,5 @@
 name = "apod-classification-worker"
-main = "index.ts"
+main = "src/index.ts"
 compatibility_date = "2024-08-15"
 compatibility_flags = ["nodejs_compat"]
 
