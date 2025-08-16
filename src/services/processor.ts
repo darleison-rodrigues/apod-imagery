@@ -94,14 +94,12 @@ export class APODProcessor {
 		private async processSingleAPODItem(apodData: APODData): Promise<void> {
 		// Skip non-image media types
 		if (!this.isImageMedia(apodData)) {
-			console.log(`Skipping ${apodData.date}: Not an image media type.`);
 			this.metrics.skipped++;
 			return;
 		}
 
 		// Skip already processed items
 		if (await this.storage.isAlreadyProcessed(apodData.date)) {
-			console.log(`Skipping ${apodData.date}: Already processed.`);
 			this.metrics.skipped++;
 			return;
 		}
