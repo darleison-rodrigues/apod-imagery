@@ -20,7 +20,7 @@ database_id = "115747db-5068-480e-b940-535053fd1df7 "
 # R2 Storage binding for image files
 [[r2_buckets]]
 binding = "APOD_R2"
-bucket_name = "apod-images"
+bucket_name = "apod-images-dev"
 
 # Vectorize binding for embeddings storage
 [[vectorize]]
