@@ -42,6 +42,7 @@ export default {
 		if (request.method === 'POST' && url.pathname === '/populate-d1') {
 			try {
 				const csvContent = await request.text();
+				console.log('Received CSV content length:', csvContent.length);
 
 				// Simple but robust CSV parsing
 				const lines = csvContent.split('\n')
@@ -55,6 +56,7 @@ export default {
 				// Parse headers - your CSV headers
 				const headerLine = lines[0];
 				const headers = headerLine.split(',').map(h => h.trim().toLowerCase());
+				console.log('CSV Headers:', headers);
 
 				const dataToInsert: any[] = [];
 				const errors: string[] = [];
@@ -136,6 +138,7 @@ export default {
 					return new Response(`No valid data to insert. Errors: ${errors.join('; ')}`, { status: 400 });
 				}
 
+				console.log(`Preparing to insert ${dataToInsert.length} records`);
 
 				// Create batch insert statements
 				const statements: any[] = [];
@@ -157,7 +160,10 @@ export default {
 						Number(data.is_relevant)
 					];
 
-
+					// Debug first few rows
+					if (i < 2) {
+						console.log(`Row ${i + 1} params:`, params.map((p, idx) => `${idx}: ${typeof p} = ${p}`));
+					}
 
 					const statement = env.APOD_D1.prepare(
 						`INSERT INTO apod_metadata_dev 
@@ -169,6 +175,7 @@ export default {
 					statements.push(statement);
 				}
 
+				console.log(`Executing batch insert for ${statements.length} statements`);
 
 				// Execute batch insert
 				const results = await env.APOD_D1.batch(statements);
@@ -176,6 +183,7 @@ export default {
 				// Check results
 				const failed = results.filter(r => !r.success);
 				if (failed.length > 0) {
+					console.error('Failed inserts:', failed);
 					return new Response(
 						`Partial success: ${results.length - failed.length}/${results.length} inserted. ${errors.length} parse errors.`,
 						{ status: 207 }
@@ -183,9 +191,11 @@ export default {
 				}
 
 				const message = `Successfully inserted ${results.length} records${errors.length > 0 ? ` (${errors.length} rows skipped)` : ''}.`;
+				console.log(message);
 				return new Response(message, { status: 200 });
 
 			} catch (error) {
+				console.error('Error populating D1:', error);
 				return new Response(
 					`Error populating D1: ${error instanceof Error ? error.message : 'Unknown error'}`,
 					{ status: 500 }
@@ -235,6 +245,7 @@ export default {
 				const processingMetrics = await processor.processAPODData(apodData);
 
 				// Log metrics for the current batch
+				console.log(`Batch processing metrics for ${batchStartDate} to ${batchEndDate}:`, processingMetrics);
 
 				// Handle processing failures for the current batch
 				if (processingMetrics.failed && processingMetrics.failed > 0) {
