@@ -117,7 +117,6 @@ export default {
 		// Fallback for other requests (e.g., scheduled events)
 		return new Response('Not found or invalid request.', { status: 404 });
 	},
-}
 
 	/**
 	 * Scheduled event handler for APOD processing
