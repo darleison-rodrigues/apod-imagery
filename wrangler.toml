@@ -14,7 +14,7 @@ binding = "AI"
 # D1 Database binding for metadata storage
 [[d1_databases]]
 binding = "APOD_D1"
-database_name = "apod-metadata"
+database_name = "apod-metadata-dev"
 database_id = "115747db-5068-480e-b940-535053fd1df7"
 
 # R2 Storage binding for image files
@@ -25,7 +25,7 @@ bucket_name = "apod-images-dev"
 # Vectorize binding for embeddings storage
 [[vectorize]]
 binding = "VECTORIZE_INDEX"
-index_name = "apod-embeddings"
+index_name = "apod-embeddings-dev"
 
 # Environment variables
 [vars]
@@ -46,4 +46,4 @@ ENABLE_DETAILED_LOGGING = "false"
 [env.development.vars]
 d1_databases = { binding = "APOD_D1", database_name = "apod-metadata-dev"}
 r2_buckets = { binding = "APOD_R2", bucket_name = "apod-images-dev" }
-vectorize = { binding = "VECTORIZE_INDEX", index_name = "apod-vectors-dev" }
+vectorize = { binding = "VECTORIZE_INDEX", index_name = "apod-embeddings-dev" }
