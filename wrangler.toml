@@ -27,22 +27,21 @@ bucket_name = "apod-images-dev"
 [[vectorize]]
 binding = "APOD_SMALL_384D_VECTORIZE"
 index_name = "apod_small_384d"
-vector_dimensions = 384
 
 [[vectorize]]
 binding = "APOD_BASE_768D_VECTORIZE"
 index_name = "apod_base_768d"
-vector_dimensions = 768
+
 
 [[vectorize]]
 binding = "APOD_LARGE_1024D_VECTORIZE"
 index_name = "apod_large_1024d"
-vector_dimensions = 1024
+
 
 [[vectorize]]
 binding = "APOD_M3_MULTI_VECTORIZE"
 index_name = "apod_m3_multi"
-vector_dimensions = 1024
+
 
 # Environment variables
 [vars]
