@@ -4,7 +4,7 @@
   "description": "Cloudflare Worker for APOD image classification and storage",
   "main": "index.ts",
   "scripts": {
-    "dev": "wrangler dev --test-scheduled",
+    "dev": "wrangler dev --test-scheduled --experimental-vectorize-bind-to-prod",
     "deploy": "wrangler deploy",
     "cf-typegen": "wrangler types",
     "build": "tsc",

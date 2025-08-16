@@ -54,7 +54,6 @@ export default {
 						values.push(current.trim().replace(/^^"|"$/g, '')); // Don't forget the last value
 
 						if (values.length !== headers.length) {
-							errors.push(`Row ${i + 1}: Column count mismatch. Expected ${headers.length}, got ${values.length}`);
 							continue;
 						}
 
@@ -100,7 +99,6 @@ export default {
 						dataToInsert.push(mappedData);
 
 					} catch (rowError) {
-						errors.push(`Row ${i + 1}: ${rowError instanceof Error ? rowError.message : 'Parse error'}`);
 					}
 				}
 
@@ -132,7 +130,6 @@ export default {
 					console.log('Parameters for bind:', JSON.stringify(params)); // Add this logging
 					// Debug first few rows
 					if (i < 2) {
-						console.log(`Row ${i + 1} params:`, params.map((p, idx) => `${idx}: ${typeof p} = ${p}`));
 					}
 
 					const statement = env.APOD_D1.prepare(
@@ -199,19 +196,22 @@ export default {
 			const processor = new APODProcessor(env);
 
 			const r2CsvUrl = 'https://pub-59ec19944cea4f0689b805364aa998d8.r2.dev/apod_master_data.csv';
-			console.log(`Fetching CSV from: ${r2CsvUrl}`);
-			const response = await fetch(r2CsvUrl);
+            console.log(`Attempting to fetch CSV from: ${r2CsvUrl}`);
+            const response = await fetch(r2CsvUrl);
 
-			if (!response.ok) {
-				throw new Error(`Failed to fetch CSV from R2: ${response.statusText}`);
-			}
+            console.log(`Fetch response status: ${response.status} ${response.statusText}`);
+            if (!response.ok) {
+                throw new Error(`Failed to fetch CSV from R2. Status: ${response.status}, StatusText: ${response.statusText}`);
+            }
 
-			const csvContent = await response.text();
-			console.log('Received CSV content length:', csvContent.length);
+            const csvContent = await response.text();
+            console.log(`Successfully fetched CSV. Received content length: ${csvContent.length}`);
 
-			const lines = csvContent.split('\n')
-				.map(line => line.trim())
-				.filter(line => line.length > 0);
+            console.log('Starting CSV parsing...');
+            const lines = csvContent.split('\n')
+                .map(line => line.trim())
+                .filter(line => line.length > 0);
+            console.log(`CSV parsing complete. Found ${lines.length} lines.`);
 
 			if (lines.length < 2) {
 				throw new Error('CSV must contain headers and at least one data row.');
@@ -242,7 +242,6 @@ export default {
 				values.push(current.trim().replace(/^^"|"$/g, ''));
 
 				if (values.length !== headers.length) {
-					console.warn(`Row ${i + 1}: Column count mismatch. Expected ${headers.length}, got ${values.length}. Skipping row.`);
 					continue;
 				}
 

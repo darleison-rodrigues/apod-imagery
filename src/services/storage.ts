@@ -274,7 +274,13 @@ export class StorageService {
 			}
 		};
 
-		await this.env.VECTORIZE_INDEX.upsert([vectorRecord]);
+		try {
+			await this.env.VECTORIZE_INDEX.upsert([vectorRecord]);
+			console.log(`Embeddings successfully stored for ${apodData.date}.`);
+		} catch (error) {
+			console.error(`Failed to store embeddings for ${apodData.date}: ${this.extractErrorMessage(error)}`);
+			throw error;
+		}
 	}
 
 	/**
