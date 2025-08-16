@@ -148,18 +148,18 @@ export default {
 
 					// Ensure all parameters are properly typed
 					const params = [
-						String(data.date),
-						String(data.title),
-						String(data.explanation),
-						String(data.image_url),
-						String(data.r2_url),
-						data.category ? String(data.category) : null,
-						data.confidence !== null ? Number(data.confidence) : null,
-						data.image_description ? String(data.image_description) : null,
-						data.copyright ? String(data.copyright) : null,
-						Number(data.is_relevant)
+						String(data.date || ''),
+						String(data.title || ''),
+						String(data.explanation || ''),
+						String(data.image_url || ''),
+						String(data.r2_url || ''),
+						data.category === undefined ? null : String(data.category),
+						data.confidence === undefined ? null : Number(data.confidence),
+						data.image_description === undefined ? null : String(data.image_description),
+						data.copyright === undefined ? null : String(data.copyright),
+						data.is_relevant === undefined ? 0 : Number(data.is_relevant),
 					];
-
+					console.log('Parameters for bind:', JSON.stringify(params)); // Add this logging
 					// Debug first few rows
 					if (i < 2) {
 						console.log(`Row ${i + 1} params:`, params.map((p, idx) => `${idx}: ${typeof p} = ${p}`));
@@ -168,9 +168,8 @@ export default {
 					const statement = env.APOD_D1.prepare(
 						`INSERT INTO apod_metadata_dev 
 					 (date, title, explanation, image_url, r2_url, category, confidence, image_description, copyright, is_relevant) 
-					 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-						params
-					);
+					 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+					).bind(...params); // Use .bind() with spread operator
 
 					statements.push(statement);
 				}
