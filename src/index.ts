@@ -43,174 +43,157 @@ export default {
 			try {
 				const csvContent = await request.text();
 
-				// Better CSV parsing - handle quotes and commas within fields
-				const parseCSVLine = (line: string): string[] => {
-					const result: string[] = [];
-					let current = '';
-					let inQuotes = false;
-
-					for (let i = 0; i < line.length; i++) {
-						const char = line[i];
-
-						if (char === '"') {
-							if (inQuotes && line[i + 1] === '"') {
-								// Handle escaped quotes
-								current += '"';
-								i++; // Skip next quote
-							} else {
-								// Toggle quote state
-								inQuotes = !inQuotes;
-							}
-						} else if (char === ',' && !inQuotes) {
-							// End of field
-							result.push(current.trim());
-							current = '';
-						} else {
-							current += char;
-						}
-					}
-
-					// Add the last field
-					result.push(current.trim());
-					return result;
-				};
-
+				// Simple but robust CSV parsing
 				const lines = csvContent.split('\n')
 					.map(line => line.trim())
 					.filter(line => line.length > 0);
 
-				if (lines.length === 0) {
-					return new Response('No CSV content provided.', { status: 400 });
-				}
-
 				if (lines.length < 2) {
-					return new Response('CSV must contain at least headers and one data row.', { status: 400 });
+					return new Response('CSV must contain headers and at least one data row.', { status: 400 });
 				}
 
-				const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().replace(/['"]/g, ''));
+				// Parse headers - your CSV headers
+				const headerLine = lines[0];
+				const headers = headerLine.split(',').map(h => h.trim().toLowerCase());
 
 				const dataToInsert: any[] = [];
 				const errors: string[] = [];
 
+				// Process each data row
 				for (let i = 1; i < lines.length; i++) {
 					try {
-						const values = parseCSVLine(lines[i]);
+						const line = lines[i];
+						const values = [];
+						let current = '';
+						let inQuotes = false;
+
+						// Parse CSV line handling commas in quoted fields
+						for (let j = 0; j < line.length; j++) {
+							const char = line[j];
+							if (char === '"') {
+								inQuotes = !inQuotes;
+							} else if (char === ',' && !inQuotes) {
+								values.push(current.trim().replace(/^"|"$/g, ''));
+								current = '';
+							} else {
+								current += char;
+							}
+						}
+						values.push(current.trim().replace(/^"|"$/g, '')); // Don't forget the last value
 
 						if (values.length !== headers.length) {
-							// Continue processing, but pad with empty strings if needed
+							errors.push(`Row ${i + 1}: Column count mismatch. Expected ${headers.length}, got ${values.length}`);
+							continue;
 						}
 
-						const row: { [key: string]: any } = {};
+						// Create row object
+						const row: { [key: string]: string } = {};
 						headers.forEach((header, index) => {
-							const value = values[index] ? values[index].replace(/^"|"$/g, '').trim() : '';
-							row[header] = value;
+							row[header] = values[index] || '';
 						});
 
-						// Helper function to safely get values
-						const getValue = (key: string): string => row[key] || '';
+						// Helper functions
+						const getValue = (key: string): string => {
+							const val = row[key] || '';
+							return val === 'nan' || val === 'NaN' ? '' : val;
+						};
+
 						const getFloatValue = (key: string): number | null => {
 							const val = getValue(key);
-							if (!val) return null;
+							if (!val || val === 'nan' || val === 'NaN') return null;
 							const parsed = parseFloat(val);
 							return isNaN(parsed) ? null : parsed;
 						};
-						const getIntValue = (key: string): number => {
-							const val = getValue(key);
-							if (!val) return 0;
-							const parsed = parseInt(val);
-							return isNaN(parsed) ? 0 : parsed;
-						};
 
-						// Map CSV data to D1 schema with better error handling
+						// Map your specific CSV columns to D1 schema
 						const mappedData = {
 							date: getValue('date'),
 							title: getValue('title'),
 							explanation: getValue('explanation'),
-							image_url: getValue('url') || getValue('image_url'),
-							r2_url: getValue('hdurl') || getValue('url') || getValue('image_url'),
-							category: getValue('category') || null,
-							confidence: getFloatValue('confidence'),
-							image_description: getValue('image_description') || null,
+							image_url: getValue('url'),
+							r2_url: getValue('hdurl') || getValue('url'),
+							category: getValue('predicted_category') || null,
+							confidence: getFloatValue('confidence_score'),
+							image_description: null, // Not in your CSV
 							copyright: getValue('copyright') || null,
-							is_relevant: getIntValue('is_relevant'),
+							is_relevant: 1, // Default to relevant
 						};
 
 						// Validate required fields
-						if (!mappedData.date) {
-							errors.push(`Row ${i + 1}: Missing required 'date' field`);
-							continue;
-						}
-						if (!mappedData.title) {
-							errors.push(`Row ${i + 1}: Missing required 'title' field`);
+						if (!mappedData.date || !mappedData.title || !mappedData.explanation || !mappedData.image_url) {
+							errors.push(`Row ${i + 1}: Missing required fields`);
 							continue;
 						}
 
 						dataToInsert.push(mappedData);
 
 					} catch (rowError) {
-						errors.push(`Row ${i + 1}: ${rowError instanceof Error ? rowError.message : 'Unknown parsing error'}`);
+						errors.push(`Row ${i + 1}: ${rowError instanceof Error ? rowError.message : 'Parse error'}`);
 					}
 				}
 
 				if (dataToInsert.length === 0) {
-					return new Response(`No valid data to insert. Errors: ${errors.join(', ')}`, { status: 400 });
+					return new Response(`No valid data to insert. Errors: ${errors.join('; ')}`, { status: 400 });
 				}
 
-				// Log warnings for any errors but continue with valid data
-				if (errors.length > 0) {
-				}
 
-				// Prepare batch insert statements with proper parameterization
-				const statements = dataToInsert.map(data => {
+				// Create batch insert statements
+				const statements: any[] = [];
+
+				for (let i = 0; i < dataToInsert.length; i++) {
+					const data = dataToInsert[i];
+
+					// Ensure all parameters are properly typed
 					const params = [
-						data.date,
-						data.title,
-						data.explanation,
-						data.image_url,
-						data.r2_url,
-						data.category,
-						data.confidence,
-						data.image_description,
-						data.copyright,
-						data.is_relevant,
+						String(data.date),
+						String(data.title),
+						String(data.explanation),
+						String(data.image_url),
+						String(data.r2_url),
+						data.category ? String(data.category) : null,
+						data.confidence !== null ? Number(data.confidence) : null,
+						data.image_description ? String(data.image_description) : null,
+						data.copyright ? String(data.copyright) : null,
+						Number(data.is_relevant)
 					];
 
-					return env.APOD_D1.prepare(
-						`INSERT INTO apod_metadata_dev (date, title, explanation, image_url, r2_url, category, confidence, image_description, copyright, is_relevant)
+
+
+					const statement = env.APOD_D1.prepare(
+						`INSERT INTO apod_metadata_dev 
+					 (date, title, explanation, image_url, r2_url, category, confidence, image_description, copyright, is_relevant) 
 					 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 						params
 					);
-				});
+
+					statements.push(statement);
+				}
 
 
 				// Execute batch insert
 				const results = await env.APOD_D1.batch(statements);
 
-				// Check for any failed statements
-				const failedResults = results.filter(result => !result.success);
-				if (failedResults.length > 0) {
+				// Check results
+				const failed = results.filter(r => !r.success);
+				if (failed.length > 0) {
 					return new Response(
-						`Partially successful: ${results.length - failedResults.length} inserted, ${failedResults.length} failed. ${errors.length > 0 ? `Parse errors: ${errors.length}` : ''}`,
+						`Partial success: ${results.length - failed.length}/${results.length} inserted. ${errors.length} parse errors.`,
 						{ status: 207 }
 					);
 				}
 
-				const responseMessage = `Successfully populated D1 with ${dataToInsert.length} records.${errors.length > 0 ? ` (${errors.length} rows skipped due to errors)` : ''}`;
-				return new Response(responseMessage, { status: 200 });
+				const message = `Successfully inserted ${results.length} records${errors.length > 0 ? ` (${errors.length} rows skipped)` : ''}.`;
+				return new Response(message, { status: 200 });
 
 			} catch (error) {
-
-				// More detailed error information
-				const errorMessage = error instanceof Error
-					? `${error.name}: ${error.message}${error.stack ? `\n${error.stack}` : ''}`
-					: 'Unknown error occurred';
-
-				return new Response(`Error populating D1: ${errorMessage}`, { status: 500 });
+				return new Response(
+					`Error populating D1: ${error instanceof Error ? error.message : 'Unknown error'}`,
+					{ status: 500 }
+				);
 			}
 		}
 
-		// Fallback for other requests
-		return new Response('Not found or invalid request.', { status: 404 });
+		return new Response('Not found', { status: 404 });
 	},
 
 	/**
@@ -252,7 +235,6 @@ export default {
 				const processingMetrics = await processor.processAPODData(apodData);
 
 				// Log metrics for the current batch
-				console.log(`Batch processing metrics for ${batchStartDate} to ${batchEndDate}:`, processingMetrics);
 
 				// Handle processing failures for the current batch
 				if (processingMetrics.failed && processingMetrics.failed > 0) {
