@@ -2,20 +2,22 @@
   "name": "apod-classification-worker",
   "version": "1.0.0",
   "description": "Cloudflare Worker for APOD image classification and storage",
-  "main": "src/index.ts",
+  "main": "index.ts",
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "cf-typegen": "wrangler types",
     "build": "tsc",
-    "lint": "eslint src/**/*.ts",
+    "lint": "eslint ./**/*.ts",
     "test": "jest"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20240815.0",
     "@types/node": "^20.14.11",
     "typescript": "^5.5.3",
-    "wrangler": "^3.65.1"
+    "wrangler": "^3.65.1",
+    "eslint": "^8.57.0",
+    "jest": "^29.7.0",
+    "@types/jest": "^29.5.12"
   },
   "dependencies": {
     "@cloudflare/ai": "^1.0.49"
