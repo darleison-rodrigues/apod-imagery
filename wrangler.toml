@@ -48,3 +48,6 @@ ENABLE_DETAILED_LOGGING = "false"
 d1_databases = { binding = "APOD_D1", database_name = "apod-metadata-dev"}
 r2_buckets = { binding = "APOD_R2", bucket_name = "apod-images-dev" }
 vectorize = { binding = "VECTORIZE_INDEX", index_name = "apod-embeddings-dev" }
+
+[observability.logs]
+enabled = true

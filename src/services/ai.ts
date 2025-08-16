@@ -1,10 +1,13 @@
 import { APODData, ClassificationResult } from '../types';
+import { CelestialImageValidator, ValidationResult } from '../utils/guardrails';
 
 export class AIService {
 	private ai: Ai;
+    private validator: CelestialImageValidator;
 
 	constructor(ai: Ai) {
 		this.ai = ai;
+        this.validator = new CelestialImageValidator();
 	}
 
 	/**
@@ -24,14 +27,15 @@ export class AIService {
 			]);
 
 			const primaryCategory = textClassification[0]?.label || 'unknown';
-			const isAstronomicalObject = this.isValidCelestialObject(primaryCategory);
+
+			const validationResult = this.validator.validateCelestialImage(apodData.title, apodData.explanation);
 
 			return {
 				category: primaryCategory,
 				confidence: textClassification[0]?.score || 0,
 				imageDescription: imageAnalysis.description || 'Unable to generate description',
 				embeddings: textEmbeddings,
-				isRelevant: isAstronomicalObject,
+				isRelevant: validationResult.isValid,
 			};
 		} catch (error) {
 			console.error('Classification failed:', error);
@@ -39,23 +43,7 @@ export class AIService {
 		}
 	}
 
-	/**
-	 * Determines if a category represents a valid celestial object or phenomenon
-	 * @param category - The classified category
-	 * @returns boolean - Whether the category is astronomically relevant
-	 */
-	private isValidCelestialObject(category: string): boolean {
-		const astronomicalCategories = [
-			"Galaxy", "Nebula", "Star Cluster", "Planet", "Moon",
-			"Comet", "Asteroid", "Meteor", "Supernova", "Black Hole",
-			"Pulsar", "Quasar", "Solar Eclipse", "Lunar Eclipse",
-			"Aurora", "Constellation", "Star Formation", "Planetary Nebula"
-		];
-		
-		return astronomicalCategories.some(validCategory => 
-			category.toLowerCase().includes(validCategory.toLowerCase())
-		);
-	}
+	
 
 	/**
 	 * Analyzes astronomical images using vision-language model

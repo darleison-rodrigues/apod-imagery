@@ -84,6 +84,24 @@ sequenceDiagram
     end
 ```
 
+### Data Processing Flow
+
+```mermaid
+graph TD
+    A[APOD Data<br/>(Image + Text)] --> B{Multi-Modal Feature Extraction};
+    B --> C[Llava<br/>(Image Captioning)];
+    B --> D[Image Classification<br/>(e.g., ResNet)];
+    B --> E[Text Summarization];
+    
+    C --> F[Combined Text<br/>(Original + Llava + Summaries)];
+    D --> F;
+    E --> F;
+    
+    F --> G[Text Embedding Model<br/>(e.g., BGE)];
+    G --> H{Quality Assurance<br/>(CelestialImageValidator)};
+    H --> I[Vector Database Storage];
+```
+
 ## :gear: Production Configuration
 
 ### Environment Variables
@@ -198,101 +216,6 @@ private async storeAPODData(...): Promise<void> {
 }
 ```
 
-## :wrench: Getting Started
-
-### Prerequisites
-
-- Cloudflare account with Workers, R2, D1, and Vectorize enabled
-- NASA API key (optional, for higher rate limits)
-- Node.js 18+ for development
-
-### Setup
-
-```bash
-# Clone the repository
-git clone https://github.com/yourusername/apod-imagery.git
-cd apod-imagery
-
-# Install dependencies
-npm install
-
-# Configure Cloudflare resources
-npx wrangler d1 create apod-metadata-db
-npx wrangler vectorize create apod-vectorize-index --dimensions=768 --metric=cosine
-npx wrangler r2 bucket create apod-images-bucket
-
-# Deploy the worker
-npm run deploy
-```
-
-### Database Schema
-
-```sql
--- D1 Database Schema
-CREATE TABLE apod_metadata (
-    date TEXT PRIMARY KEY,
-    title TEXT NOT NULL,
-    explanation TEXT NOT NULL,
-    image_url TEXT NOT NULL,
-    r2_url TEXT NOT NULL,
-    category TEXT,
-    confidence REAL,
-    image_description TEXT,
-    copyright TEXT,
-    processed_at TEXT NOT NULL,
-    is_relevant INTEGER DEFAULT 1
-);
-
-CREATE INDEX idx_processed_at ON apod_metadata(processed_at);
-CREATE INDEX idx_category ON apod_metadata(category);
-```
-
-## :test_tube: Testing & Validation
-
-### Recommended Evaluation Process
-
-1. **Index Configuration Verification**
-   ```bash
-   # Verify Vectorize settings
-   npx wrangler vectorize get apod-vectorize-index
-   ```
-
-2. **Semantic Search Quality Testing**
-   ```typescript
-   // Test queries for astronomical relevance
-   const testQueries = [
-     "spiral galaxy formation",
-     "supernova explosion",
-     "planetary nebula",
-     "asteroid belt"
-   ];
-   ```
-
-3. **Performance Benchmarking**
-   - Query latency: Target <100ms
-   - Throughput: Monitor concurrent request handling
-   - Error rates: Should be <1% under normal conditions
-
-## :file_folder: Project Structure
-
-```
-apod-imagery/
-├── workers/
-│   └── apodimagery/
-│       ├── index.ts              # Main processing pipeline
-│       ├── wrangler.jsonc        # Cloudflare configuration
-│       └── schema.sql            # D1 database schema
-├── evaluation/
-│   ├── vectorize_report.md       # Model evaluation analysis
-│   └── benchmarks/               # Performance tests
-├── docs/
-│   ├── API.md                    # API documentation
-│   └── DEPLOYMENT.md             # Deployment guide
-└── frontend/                     # React application (future)
-    ├── src/
-    └── public/
-```
-
 ## :warning: Production Considerations
 
 ### Security & Compliance
@@ -316,14 +239,6 @@ apod-imagery/
   "vectorize_operations": "count/minute"
 }
 ```
-
-## :handshake: Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for:
-- Code style guidelines
-- Testing requirements
-- Model evaluation protocols
-- Performance benchmarking standards
 
 ## :page_facing_up: License
 
