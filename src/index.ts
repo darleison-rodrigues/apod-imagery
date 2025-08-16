@@ -77,18 +77,7 @@ export default {
 				const statements = dataToInsert.map(data =>
 					env.APOD_D1.prepare(
 						`INSERT INTO apod_metadata_dev (date, title, explanation, image_url, r2_url, category, confidence, image_description, copyright, is_relevant)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                         ON CONFLICT(date) DO UPDATE SET
-                            title = EXCLUDED.title,
-                            explanation = EXCLUDED.explanation,
-                            image_url = EXCLUDED.image_url,
-                            r2_url = EXCLUDED.r2_url,
-                            category = EXCLUDED.category,
-                            confidence = EXCLUDED.confidence,
-                            image_description = EXCLUDED.image_description,
-                            copyright = EXCLUDED.copyright,
-                            is_relevant = EXCLUDED.is_relevant,
-                            updated_at = CURRENT_TIMESTAMP;`,
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
 						[
 							data.date,
 							data.title,
