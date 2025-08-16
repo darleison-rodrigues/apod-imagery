@@ -42,68 +42,174 @@ export default {
 		if (request.method === 'POST' && url.pathname === '/populate-d1') {
 			try {
 				const csvContent = await request.text();
-				const lines = csvContent.split('\n').filter(line => line.trim() !== '');
+
+				// Better CSV parsing - handle quotes and commas within fields
+				const parseCSVLine = (line: string): string[] => {
+					const result: string[] = [];
+					let current = '';
+					let inQuotes = false;
+
+					for (let i = 0; i < line.length; i++) {
+						const char = line[i];
+
+						if (char === '"') {
+							if (inQuotes && line[i + 1] === '"') {
+								// Handle escaped quotes
+								current += '"';
+								i++; // Skip next quote
+							} else {
+								// Toggle quote state
+								inQuotes = !inQuotes;
+							}
+						} else if (char === ',' && !inQuotes) {
+							// End of field
+							result.push(current.trim());
+							current = '';
+						} else {
+							current += char;
+						}
+					}
+
+					// Add the last field
+					result.push(current.trim());
+					return result;
+				};
+
+				const lines = csvContent.split('\n')
+					.map(line => line.trim())
+					.filter(line => line.length > 0);
 
 				if (lines.length === 0) {
 					return new Response('No CSV content provided.', { status: 400 });
 				}
 
-				const headers = lines[0].split(',');
-				const dataToInsert: any[] = [];
-
-				for (let i = 1; i < lines.length; i++) {
-					const values = lines[i].split(',');
-					const row: { [key: string]: any } = {};
-					headers.forEach((header, index) => {
-						row[header.trim()] = values[index] ? values[index].trim() : '';
-					});
-
-					// Map CSV data to D1 schema
-					dataToInsert.push({
-						date: row.date,
-						title: row.title,
-						explanation: row.explanation,
-						image_url: row.url, // Assuming 'url' from CSV maps to 'image_url'
-						r2_url: row.hdurl || row.url, // Use hdurl if available, else url
-						category: row.category || null,
-						confidence: row.confidence ? parseFloat(row.confidence) : null,
-						image_description: row.image_description || null,
-						copyright: row.copyright || null,
-						is_relevant: row.is_relevant ? parseInt(row.is_relevant) : 0,
-					});
+				if (lines.length < 2) {
+					return new Response('CSV must contain at least headers and one data row.', { status: 400 });
 				}
 
-				// Prepare batch insert statements
-				const statements = dataToInsert.map(data =>
-					env.APOD_D1.prepare(
+				const headers = parseCSVLine(lines[0]).map(h => h.toLowerCase().replace(/['"]/g, ''));
+
+				const dataToInsert: any[] = [];
+				const errors: string[] = [];
+
+				for (let i = 1; i < lines.length; i++) {
+					try {
+						const values = parseCSVLine(lines[i]);
+
+						if (values.length !== headers.length) {
+							// Continue processing, but pad with empty strings if needed
+						}
+
+						const row: { [key: string]: any } = {};
+						headers.forEach((header, index) => {
+							const value = values[index] ? values[index].replace(/^"|"$/g, '').trim() : '';
+							row[header] = value;
+						});
+
+						// Helper function to safely get values
+						const getValue = (key: string): string => row[key] || '';
+						const getFloatValue = (key: string): number | null => {
+							const val = getValue(key);
+							if (!val) return null;
+							const parsed = parseFloat(val);
+							return isNaN(parsed) ? null : parsed;
+						};
+						const getIntValue = (key: string): number => {
+							const val = getValue(key);
+							if (!val) return 0;
+							const parsed = parseInt(val);
+							return isNaN(parsed) ? 0 : parsed;
+						};
+
+						// Map CSV data to D1 schema with better error handling
+						const mappedData = {
+							date: getValue('date'),
+							title: getValue('title'),
+							explanation: getValue('explanation'),
+							image_url: getValue('url') || getValue('image_url'),
+							r2_url: getValue('hdurl') || getValue('url') || getValue('image_url'),
+							category: getValue('category') || null,
+							confidence: getFloatValue('confidence'),
+							image_description: getValue('image_description') || null,
+							copyright: getValue('copyright') || null,
+							is_relevant: getIntValue('is_relevant'),
+						};
+
+						// Validate required fields
+						if (!mappedData.date) {
+							errors.push(`Row ${i + 1}: Missing required 'date' field`);
+							continue;
+						}
+						if (!mappedData.title) {
+							errors.push(`Row ${i + 1}: Missing required 'title' field`);
+							continue;
+						}
+
+						dataToInsert.push(mappedData);
+
+					} catch (rowError) {
+						errors.push(`Row ${i + 1}: ${rowError instanceof Error ? rowError.message : 'Unknown parsing error'}`);
+					}
+				}
+
+				if (dataToInsert.length === 0) {
+					return new Response(`No valid data to insert. Errors: ${errors.join(', ')}`, { status: 400 });
+				}
+
+				// Log warnings for any errors but continue with valid data
+				if (errors.length > 0) {
+				}
+
+				// Prepare batch insert statements with proper parameterization
+				const statements = dataToInsert.map(data => {
+					const params = [
+						data.date,
+						data.title,
+						data.explanation,
+						data.image_url,
+						data.r2_url,
+						data.category,
+						data.confidence,
+						data.image_description,
+						data.copyright,
+						data.is_relevant,
+					];
+
+					return env.APOD_D1.prepare(
 						`INSERT INTO apod_metadata_dev (date, title, explanation, image_url, r2_url, category, confidence, image_description, copyright, is_relevant)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
-						[
-							String(data.date || ''), // Ensure string
-							String(data.title || ''), // Ensure string
-							String(data.explanation || ''), // Ensure string
-							String(data.image_url || ''), // Ensure string
-							String(data.r2_url || ''), // Ensure string
-							data.category === undefined ? null : String(data.category), // Ensure string or null
-							data.confidence === undefined ? null : Number(data.confidence), // Ensure number or null
-							data.image_description === undefined ? null : String(data.image_description), // Ensure string or null
-							data.copyright === undefined ? null : String(data.copyright), // Ensure string or null
-							data.is_relevant === undefined ? 0 : Number(data.is_relevant), // Ensure number or 0
-						]
-					)
-				);
+					 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+						params
+					);
+				});
 
-				await env.APOD_D1.batch(statements);
 
-				return new Response(`Successfully populated D1 with ${dataToInsert.length} records.`, { status: 200 });
+				// Execute batch insert
+				const results = await env.APOD_D1.batch(statements);
+
+				// Check for any failed statements
+				const failedResults = results.filter(result => !result.success);
+				if (failedResults.length > 0) {
+					return new Response(
+						`Partially successful: ${results.length - failedResults.length} inserted, ${failedResults.length} failed. ${errors.length > 0 ? `Parse errors: ${errors.length}` : ''}`,
+						{ status: 207 }
+					);
+				}
+
+				const responseMessage = `Successfully populated D1 with ${dataToInsert.length} records.${errors.length > 0 ? ` (${errors.length} rows skipped due to errors)` : ''}`;
+				return new Response(responseMessage, { status: 200 });
 
 			} catch (error) {
-				console.error('Error populating D1:', error);
-				return new Response(`Error populating D1: ${error instanceof Error ? error.message : 'Unknown error'}`, { status: 500 });
+
+				// More detailed error information
+				const errorMessage = error instanceof Error
+					? `${error.name}: ${error.message}${error.stack ? `\n${error.stack}` : ''}`
+					: 'Unknown error occurred';
+
+				return new Response(`Error populating D1: ${errorMessage}`, { status: 500 });
 			}
 		}
 
-		// Fallback for other requests (e.g., scheduled events)
+		// Fallback for other requests
 		return new Response('Not found or invalid request.', { status: 404 });
 	},
 
@@ -116,20 +222,20 @@ export default {
 	 * @throws {Error} Propagates critical processing errors
 	 */
 	async scheduled(
-		controller: ScheduledController, 
-		env: Env, 
+		controller: ScheduledController,
+		env: Env,
 		ctx: ExecutionContext
 	): Promise<void> {
 		const startTime = Date.now();
-		
+
 		try {
 			// Validate environment configuration
 			if (!env) {
 				throw new Error('Environment configuration is required');
 			}
-			
+
 			const processor = new APODProcessor(env);
-			
+
 			// Determine dates for fetching APOD data in 5-year chunks
 			const currentYear = new Date().getFullYear();
 			const START_APOD_YEAR = 1995; // First year of APOD data
@@ -138,14 +244,13 @@ export default {
 				const batchStartDate = `${year}-01-01`;
 				const batchEndDate = `${Math.min(year + 4, currentYear)}-12-31`; // End of 5-year period or current year end
 
-				console.log(`Fetching APOD data for range: ${batchStartDate} to ${batchEndDate}`);
 
 				// Fetch data from NASA API for the current batch
 				const apodData = await fetchAPODData(env.NASA_API_KEY, batchStartDate, batchEndDate);
-				
+
 				// Process the fetched data
 				const processingMetrics = await processor.processAPODData(apodData);
-				
+
 				// Log metrics for the current batch
 				console.log(`Batch processing metrics for ${batchStartDate} to ${batchEndDate}:`, processingMetrics);
 
@@ -157,10 +262,10 @@ export default {
 					}
 				}
 			}
-			
+
 		} catch (error) {
 			const duration = Date.now() - startTime;
-			
+
 			// Structure error information for proper error handling
 			const errorDetails = {
 				message: error instanceof Error ? error.message : 'Unknown error',
@@ -168,7 +273,7 @@ export default {
 				duration: `${duration}ms`,
 				timestamp: new Date().toISOString()
 			};
-			
+
 			// Ensure error is properly propagated for monitoring systems
 			throw new Error(`APOD worker failed: ${errorDetails.message}`);
 		}
