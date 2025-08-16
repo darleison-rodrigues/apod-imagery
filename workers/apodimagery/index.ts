@@ -1,32 +1,71 @@
 import { APODProcessor } from './services/processor';
 import { Env, APODData } from './types';
 
+/**
+ * APOD Data storage - In production, this should be replaced with external data source
+ */
 const apodDataList: APODData[] = [];
 
+/**
+ * Cloudflare Worker for processing NASA Astronomy Picture of the Day (APOD) data
+ * Handles scheduled execution for APOD classification and processing
+ */
 export default {
+	/**
+	 * Scheduled event handler for APOD processing
+	 * 
+	 * @param controller - Cloudflare scheduled controller instance
+	 * @param env - Environment variables and bindings
+	 * @param ctx - Execution context for managing async operations
+	 * @throws {Error} Propagates critical processing errors
+	 */
 	async scheduled(
 		controller: ScheduledController, 
 		env: Env, 
 		ctx: ExecutionContext
 	): Promise<void> {
+		const startTime = Date.now();
+		
 		try {
-			console.log("🚀 Starting enhanced APOD classification worker...");
+			// Validate environment configuration
+			if (!env) {
+				throw new Error('Environment configuration is required');
+			}
 			
 			const processor = new APODProcessor(env);
 			
-			// In a real application, you would fetch this data from the NASA API
-			// For this example, we'll use the placeholder list.
-			const metrics = await processor.processAPODData(apodDataList);
+			// TODO: Replace with NASA API integration
+			// Current implementation uses placeholder data for development
+			// Production should fetch from: https://api.nasa.gov/planetary/apod
+			const processingMetrics = await processor.processAPODData(apodDataList);
 			
-			if (metrics.failed > 0) {
-				console.warn(`⚠️ Processing completed with ${metrics.failed} failures`);
+			// Calculate processing duration
+			const duration = Date.now() - startTime;
+			
+			// Handle processing failures
+			if (processingMetrics.failed && processingMetrics.failed > 0) {
+				const errorRate = (processingMetrics.failed / processingMetrics.processed) * 100;
+				
+				// Consider alerting or retry logic for high error rates
+				if (errorRate > 50) {
+					// High error rate detected - consider implementing alerting mechanism
+					throw new Error(`High error rate detected: ${errorRate.toFixed(2)}% - manual intervention required`);
+				}
 			}
 			
-			console.log("✨ APOD classification worker completed successfully");
-			
 		} catch (error) {
-			console.error("💥 Critical error in APOD classification worker:", error);
-			throw error;
+			const duration = Date.now() - startTime;
+			
+			// Structure error information for proper error handling
+			const errorDetails = {
+				message: error instanceof Error ? error.message : 'Unknown error',
+				stack: error instanceof Error ? error.stack : undefined,
+				duration: `${duration}ms`,
+				timestamp: new Date().toISOString()
+			};
+			
+			// Ensure error is properly propagated for monitoring systems
+			throw new Error(`APOD worker failed: ${errorDetails.message}`);
 		}
-	},
+	}
 };

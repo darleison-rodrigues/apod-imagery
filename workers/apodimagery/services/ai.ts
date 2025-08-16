@@ -1,4 +1,3 @@
-import { Ai } from '@cloudflare/ai';
 import { APODData, ClassificationResult } from '../types';
 
 export class AIService {
@@ -8,52 +7,148 @@ export class AIService {
 		this.ai = ai;
 	}
 
+	/**
+	 * Classifies APOD data using multiple AI models for comprehensive analysis
+	 * @param apodData - The APOD metadata containing title and explanation
+	 * @param imageBlob - The image blob for visual analysis
+	 * @returns Promise<ClassificationResult> - Complete classification results
+	 */
 	async classifyAPOD(apodData: APODData, imageBlob: Blob): Promise<ClassificationResult> {
-		const text = `${apodData.title}. ${apodData.explanation}`;
+		const combinedText = `${apodData.title}. ${apodData.explanation}`;
 		
-		const [imageToTextResult, textClassificationResult, textEmbeddings] = await Promise.all([
-			this.runImageToText(imageBlob),
-			this.runTextClassification(text),
-			this.generateTextEmbeddings(text)
-		]);
+		try {
+			const [imageAnalysis, textClassification, textEmbeddings] = await Promise.all([
+				this.analyzeImage(imageBlob),
+				this.classifyText(combinedText),
+				this.generateEmbeddings(combinedText)
+			]);
 
-		const category = textClassificationResult[0]?.label || 'unknown';
-		const isRelevant = this.isCelestialObject(category);
+			const primaryCategory = textClassification[0]?.label || 'unknown';
+			const isAstronomicalObject = this.isValidCelestialObject(primaryCategory);
 
-		return {
-			category,
-			confidence: textClassificationResult[0]?.score || 0,
-			imageDescription: imageToTextResult.description || 'No description available',
-			embeddings: textEmbeddings,
-			isRelevant,
-		};
+			return {
+				category: primaryCategory,
+				confidence: textClassification[0]?.score || 0,
+				imageDescription: imageAnalysis.description || 'Unable to generate description',
+				embeddings: textEmbeddings,
+				isRelevant: isAstronomicalObject,
+			};
+		} catch (error) {
+			console.error('Classification failed:', error);
+			throw new Error(`APOD classification failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+		}
 	}
 
-	private isCelestialObject(category: string): boolean {
-		const celestialCategories = [
-			"Galaxy", "Nebula", "Star Cluster", "Planet", 
-			"Comet", "Asteroid", "Supernova", "Black Hole"
+	/**
+	 * Determines if a category represents a valid celestial object or phenomenon
+	 * @param category - The classified category
+	 * @returns boolean - Whether the category is astronomically relevant
+	 */
+	private isValidCelestialObject(category: string): boolean {
+		const astronomicalCategories = [
+			"Galaxy", "Nebula", "Star Cluster", "Planet", "Moon",
+			"Comet", "Asteroid", "Meteor", "Supernova", "Black Hole",
+			"Pulsar", "Quasar", "Solar Eclipse", "Lunar Eclipse",
+			"Aurora", "Constellation", "Star Formation", "Planetary Nebula"
 		];
-		return celestialCategories.includes(category);
+		
+		return astronomicalCategories.some(validCategory => 
+			category.toLowerCase().includes(validCategory.toLowerCase())
+		);
 	}
 
-	private async runImageToText(imageBlob: Blob): Promise<any> {
+	/**
+	 * Analyzes astronomical images using vision-language model
+	 * @param imageBlob - The image to analyze
+	 * @returns Promise containing image description and analysis
+	 */
+	private async analyzeImage(imageBlob: Blob): Promise<any> {
 		const model = '@cf/llava-hf/llava-1.5-7b-hf';
+		const imageArray = new Uint8Array(await imageBlob.arrayBuffer());
+		
+		const analysisPrompt = [
+			'Analyze this astronomical image in detail.',
+			'Identify celestial objects, cosmic phenomena, and structural features.',
+			'Describe colors, brightness patterns, and spatial relationships.',
+			'Note any telescopic or observational characteristics visible.'
+		].join(' ');
+
 		const inputs = {
-			prompt: 'Describe this astronomical image in detail, including any celestial objects, phenomena, or structures visible.',
-			image: [...new Uint8Array(await imageBlob.arrayBuffer())],
+			prompt: analysisPrompt,
+			image: [...imageArray],
 		};
+
 		return await this.ai.run(model, inputs);
 	}
 
-	private async runTextClassification(text: string): Promise<any> {
+	/**
+	 * Classifies text content using natural language processing
+	 * @param text - The text content to classify
+	 * @returns Promise containing classification results with labels and scores
+	 */
+	private async classifyText(text: string): Promise<any> {
 		const model = '@cf/huggingface/distilbert-sst-2-int8';
-		return await this.ai.run(model, { text });
+		
+		// Preprocess text for better classification accuracy
+		const processedText = this.preprocessTextForClassification(text);
+		
+		return await this.ai.run(model, { text: processedText });
 	}
 
-	private async generateTextEmbeddings(text: string): Promise<number[]> {
+	/**
+	 * Generates vector embeddings for semantic search and similarity matching
+	 * @param text - The text to embed
+	 * @returns Promise<number[]> - Vector embeddings array
+	 */
+	private async generateEmbeddings(text: string): Promise<number[]> {
 		const model = '@cf/baai/bge-base-en-v1.5';
-		const { data: embeddings } = await this.ai.run(model, { text: [text] });
-		return embeddings[0];
+		
+		// Clean and optimize text for embedding generation
+		const optimizedText = this.optimizeTextForEmbedding(text);
+		
+		const result = await this.ai.run(model, { text: [optimizedText] });
+		return result.data[0];
+	}
+
+	/**
+	 * Preprocesses text content to improve classification accuracy
+	 * @param text - Raw text content
+	 * @returns Processed text optimized for classification
+	 */
+	private preprocessTextForClassification(text: string): string {
+		return text
+			.replace(/\s+/g, ' ') // Normalize whitespace
+			.replace(/[^\w\s.,!?-]/g, '') // Remove special characters except basic punctuation
+			.trim()
+			.substring(0, 512); // Limit length for model constraints
+	}
+
+	/**
+	 * Optimizes text content for embedding generation
+	 * @param text - Raw text content
+	 * @returns Processed text optimized for embeddings
+	 */
+	private optimizeTextForEmbedding(text: string): string {
+		return text
+			.replace(/\s+/g, ' ') // Normalize whitespace
+			.replace(/\n+/g, ' ') // Replace line breaks with spaces
+			.trim()
+			.substring(0, 1024); // Allow longer text for embeddings
+	}
+
+	/**
+	 * Validates model availability and configuration
+	 * @returns Promise<boolean> - Whether AI services are properly configured
+	 */
+	async validateConfiguration(): Promise<boolean> {
+		try {
+			// Test with minimal inputs to verify model availability
+			const testText = "test";
+			await this.ai.run('@cf/baai/bge-base-en-v1.5', { text: [testText] });
+			return true;
+		} catch (error) {
+			console.error('AI service configuration validation failed:', error);
+			return false;
+		}
 	}
 }

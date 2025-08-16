@@ -1,5 +1,5 @@
 name = "apod-classification-worker"
-main = "src/index.ts"
+main = "index.ts"
 compatibility_date = "2024-08-15"
 compatibility_flags = ["nodejs_compat"]
 
@@ -15,7 +15,7 @@ binding = "AI"
 [[d1_databases]]
 binding = "APOD_D1"
 database_name = "apod-metadata"
-database_id = "your-d1-database-id"
+database_id = "115747db-5068-480e-b940-535053fd1df7 "
 
 # R2 Storage binding for image files
 [[r2_buckets]]
@@ -44,6 +44,6 @@ ENABLE_DETAILED_LOGGING = "false"
 # Development environment overrides
 [env.development]
 [env.development.vars]
-MAX_CONCURRENT_PROCESSING = "3"
-BATCH_SIZE = "5"
-ENABLE_DETAILED_LOGGING = "true"
+d1_databases = { binding = "APOD_D1", database_name = "apod-metadata-dev"}
+r2_buckets = { binding = "APOD_R2", bucket_name = "apod-images-dev" }
+vectorize = { binding = "VECTORIZE_INDEX", index_name = "apod-vectors-dev" }

@@ -32,3 +32,4 @@ python/data
 python/src/plots
 .wrangler
 scripts/
+**/node_modules
