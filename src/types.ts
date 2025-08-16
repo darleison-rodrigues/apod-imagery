@@ -20,6 +20,8 @@ export interface Env {
 	RETRY_ATTEMPTS?: string;
 	/** Enable detailed logging output */
 	ENABLE_DETAILED_LOGGING?: string;
+	/** NASA API Key for accessing APOD data */
+	NASA_API_KEY?: string;
 }
 
 /**

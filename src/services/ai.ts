@@ -99,8 +99,7 @@ export class AIService {
 	 * Generates vector embeddings for semantic search and similarity matching
 	 * @param text - The text to embed
 	 * @returns Promise<number[]> - Vector embeddings array
-	 */
-	private async generateEmbeddings(text: string): Promise<number[]> {
+	 */	private async generateEmbeddings(text: string): Promise<number[]> {
 		const model = '@cf/baai/bge-base-en-v1.5';
 		
 		// Clean and optimize text for embedding generation
@@ -114,8 +113,7 @@ export class AIService {
 	 * Preprocesses text content to improve classification accuracy
 	 * @param text - Raw text content
 	 * @returns Processed text optimized for classification
-	 */
-	private preprocessTextForClassification(text: string): string {
+	 */	private preprocessTextForClassification(text: string): string {
 		return text
 			.replace(/\s+/g, ' ') // Normalize whitespace
 			.replace(/[^\w\s.,!?-]/g, '') // Remove special characters except basic punctuation
@@ -127,8 +125,7 @@ export class AIService {
 	 * Optimizes text content for embedding generation
 	 * @param text - Raw text content
 	 * @returns Processed text optimized for embeddings
-	 */
-	private optimizeTextForEmbedding(text: string): string {
+	 */	private optimizeTextForEmbedding(text: string): string {
 		return text
 			.replace(/\s+/g, ' ') // Normalize whitespace
 			.replace(/\n+/g, ' ') // Replace line breaks with spaces
@@ -139,8 +136,7 @@ export class AIService {
 	/**
 	 * Validates model availability and configuration
 	 * @returns Promise<boolean> - Whether AI services are properly configured
-	 */
-	async validateConfiguration(): Promise<boolean> {
+	 */	async validateConfiguration(): Promise<boolean> {
 		try {
 			// Test with minimal inputs to verify model availability
 			const testText = "test";

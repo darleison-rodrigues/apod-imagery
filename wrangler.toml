@@ -1,4 +1,4 @@
-name = "apod-classification-worker"
+name = 'apodimagery'
 main = "src/index.ts"
 compatibility_date = "2024-08-15"
 compatibility_flags = ["nodejs_compat"]
@@ -29,6 +29,7 @@ index_name = "apod-embeddings-dev"
 
 # Environment variables
 [vars]
+NASA_API_KEY = "gI7l0aBdeDCdzfaf2k8r4O4wVXeFZa7AhU2EM0xB"
 MAX_CONCURRENT_PROCESSING = "5"
 BATCH_SIZE = "10"
 RETRY_ATTEMPTS = "3"
