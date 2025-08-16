@@ -33,3 +33,4 @@ python/src/plots
 .wrangler
 scripts/
 **/node_modules
+worker-configuration.d.ts

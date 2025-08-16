@@ -50,11 +50,17 @@ graph TB
 
 | Model | Purpose | Output | Production Notes |
 |-------|---------|--------|------------------|
-| `@cf/llava-hf/llava-1.5-7b-hf` | **Vision-Language** | Image descriptions | Specialized astronomical prompting |
-| `@cf/baai/bge-base-en-v1.5` | **Text Embedding** | 768-dimensional vectors | Optimized for cosine similarity |
-| `@cf/huggingface/distilbert-sst-2-int8` | **Text Classification** | Sentiment/category scores | Currently limited - needs astronomy-specific model |
-| `@cf/facebook/detr-resnet-50` | **Object Detection** | Bounding boxes + labels | Available for future enhancement |
-| `@cf/microsoft/resnet-50` | **Image Classification** | Image categories | Available for future enhancement |
+| `@cf/llava-hf/llava-1.5-7b-hf` | **Vision-Language** | Image descriptions | LLaVA is an open-source chatbot trained by fine-tuning LLaMA/Vicuna on GPT-generated multimodal instruction-following data. It is an auto-regressive language model, based on the transformer architecture. |
+| `@cf/baai/bge-base-en-v1.5` | **Text Embedding** | 768-dimensional vectors | BAAI general embedding (Base) model that transforms any given text into a 768-dimensional vector. Optimized for cosine similarity. |
+| `@cf/huggingface/distilbert-sst-2-int8` | **Text Classification** | Sentiment/category scores | Distilled BERT model that was finetuned on SST-2 for sentiment classification. Currently limited - needs astronomy-specific model. |
+| `@cf/facebook/detr-resnet-50` | **Object Detection** | Bounding boxes + labels | Available for future enhancement. |
+| `@cf/microsoft/resnet-50` | **Image Classification** | Image categories | 50 layers deep image classification CNN trained on more than 1M images from ImageNet. Available for future enhancement. |
+| `@cf/baai/bge-reranker-base` | **Text Reranking** | Relevance score | Different from embedding model, reranker uses question and document as input and directly output similarity instead of embedding. You can get a relevance score by inputting query and passage to the reranker. And the score can be mapped to a float value in [0,1] by sigmoid function. Available for future enhancement. |
+| `@cf/baai/bge-m3` | **Text Embeddings** | Multi-dimensional vectors | Multi-Functionality, Multi-Linguality, and Multi-Granularity embeddings model. Available for future enhancement. |
+| `@cf/unum/uform-gen2-qwen-500m` | **Image-to-Text** | Image descriptions | UForm-Gen is a small generative vision-language model primarily designed for Image Captioning and Visual Question Answering. The model was pre-trained on the internal image captioning dataset and fine-tuned on public instructions datasets: SVIT, LVIS, VQAs datasets. Available for future enhancement. |
+| `@cf/facebook/bart-large-cnn` | **Summarization** | Summarized text | BART is a transformer encoder-encoder (seq2seq) model with a bidirectional (BERT-like) encoder and an autoregressive (GPT-like) decoder. You can use this model for text summarization. Available for future enhancement. |
+| `@cf/baai/bge-large-en-v1.5` | **Text Embeddings** | 1024-dimensional vectors | BAAI general embedding (Large) model that transforms any given text into a 1024-dimensional vector. Available for future enhancement. |
+| `@cf/baai/bge-small-en-v1.5` | **Text Embeddings** | 384-dimensional vectors | BAAI general embedding (Small) model that transforms any given text into a 384-dimensional vector. Available for future enhancement. |
 
 ### Processing Workflow
 

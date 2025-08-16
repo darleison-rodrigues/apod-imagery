@@ -9,9 +9,14 @@ export class APODProcessor {
 	private metrics: ProcessingMetrics;
 	private config: ProcessingConfig;
 
+	private db: D1Database;
+	private vectorizeIndex: VectorizeIndex; // Add this line
+
 	constructor(env: Env) {
 		this.ai = new AIService(env.AI);
 		this.storage = new StorageService(env);
+		this.db = env.DB;
+		this.vectorizeIndex = env.VECTORIZE_INDEX; // Initialize Vectorize binding
 		this.metrics = this.initializeMetrics();
 		this.config = this.loadConfiguration(env);
 	}
@@ -315,24 +320,101 @@ export class APODProcessor {
 	 * Gets current processing status for monitoring
 	 * @returns ProcessingMetrics - Current processing metrics
 	 */
-	getProcessingStatus(): ProcessingMetrics {
-		return { ...this.metrics };
-	}
+	    getProcessingStatus(): ProcessingMetrics {
+        return { ...this.metrics };
+    }
 
-	/**
-	 * Validates that all required services are properly initialized
-	 * @returns Promise<boolean> - Whether all services are ready
-	 */
-	async validateServices(): Promise<boolean> {
-		try {
-			const [aiValid, storageValid] = await Promise.all([
-				this.ai.validateConfiguration(),
-				this.storage.validateConnection()
-			]);
-			
-			return aiValid && storageValid;
-		} catch (error) {
-			return false;
-		}
-	}
+    /**
+     * Processes a CSV file from R2, generates embeddings, and updates D1.
+     * @param r2CsvObjectKey - The key of the CSV object in R2.
+     * @returns Promise<ProcessingMetrics> - Complete processing statistics.
+     */
+    async processR2CSVAndGenerateEmbeddings(r2CsvObjectKey: string): Promise<ProcessingMetrics> {
+        this.metrics = this.initializeMetrics(); // Reset metrics for this run
+
+        try {
+            // 1. Fetch CSV from R2
+            const csvBlob = await this.storage.getR2Object(r2CsvObjectKey);
+            if (!csvBlob) {
+                throw new Error(`CSV object not found in R2: ${r2CsvObjectKey}`);
+            }
+            const csvContent = await csvBlob.text();
+
+            // 2. Parse CSV content (simple parsing, assumes no complex escaped commas)
+            const lines = csvContent.split('\n').filter(line => line.trim() !== '');
+            if (lines.length < 2) {
+                throw new Error('CSV must contain headers and at least one data row.');
+            }
+            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+
+            // 3. Process each row
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i].split(',').map(v => v.trim());
+                const row: { [key: string]: string } = {};
+                headers.forEach((header, index) => {
+                    row[header] = values[index] || '';
+                });
+
+                const date = row.date;
+                if (!date) {
+                    console.warn(`Skipping row ${i + 1}: Missing date.`);
+                    this.metrics.skipped++;
+                    continue;
+                }
+
+                // 4. Fetch existing data from D1
+                const existingRecord = await this.db.prepare('SELECT * FROM apod_metadata_dev WHERE date = ?').bind(date).first();
+
+                if (existingRecord) {
+                    // 5. Generate embeddings for existing record
+                    const combinedText = `${existingRecord.title}. ${existingRecord.explanation}`;
+                    try {
+                        const embeddings = await this.ai.generateEmbeddings(combinedText);
+
+                        // 6. Upsert embeddings to Vectorize
+						await this.vectorizeIndex.upsert([{
+							id: date, // Use date as the ID for the embedding
+							values: embeddings,
+							metadata: {
+								date: existingRecord.date,
+								title: existingRecord.title,
+								category: existingRecord.category,
+								is_relevant: existingRecord.is_relevant,
+							}
+						}]);
+
+						this.metrics.processed++;
+						this.metrics.relevant++; // Assuming all D1 records are relevant for embedding generation
+                    } catch (embeddingError) {
+                        this.recordProcessingFailure({ date: date, url: existingRecord.image_url, title: existingRecord.title, explanation: existingRecord.explanation }, `Embedding generation failed: ${this.extractErrorMessage(embeddingError)}`);
+                    }
+                } else {
+                    console.warn(`Skipping row ${i + 1}: Record for date ${date} not found in D1. Cannot generate embeddings.`);
+                    this.metrics.skipped++;
+                }
+            }
+        } catch (error) {
+            this.recordProcessingFailure({ date: 'N/A', url: 'N/A', title: 'N/A', explanation: 'N/A' }, `CSV processing failed: ${this.extractErrorMessage(error)}`);
+            throw error; // Re-throw to indicate overall failure
+        }
+
+        return this.finalizeProcessing();
+    }
+
+    /**
+     * Validates that all required services are properly initialized
+     * @returns Promise<boolean> - Whether all services are ready
+     */
+    async validateServices(): Promise<boolean> {
+        try {
+            const [aiValid, storageValid] = await Promise.all([
+                this.ai.validateConfiguration(),
+                this.storage.validateConnection()
+            ]);
+            
+            return aiValid && storageValid;
+        } catch (error) {
+            return false;
+        }
+    }
 }

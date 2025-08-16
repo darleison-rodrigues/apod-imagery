@@ -228,32 +228,11 @@ export default {
 
 			const processor = new APODProcessor(env);
 
-			// Determine dates for fetching APOD data in 5-year chunks
-			const currentYear = new Date().getFullYear();
-			const START_APOD_YEAR = 1995; // First year of APOD data
-
-			for (let year = START_APOD_YEAR; year <= currentYear; year += 5) {
-				const batchStartDate = `${year}-01-01`;
-				const batchEndDate = `${Math.min(year + 4, currentYear)}-12-31`; // End of 5-year period or current year end
-
-
-				// Fetch data from NASA API for the current batch
-				const apodData = await fetchAPODData(env.NASA_API_KEY, batchStartDate, batchEndDate);
-
-				// Process the fetched data
-				const processingMetrics = await processor.processAPODData(apodData);
-
-				// Log metrics for the current batch
-				console.log(`Batch processing metrics for ${batchStartDate} to ${batchEndDate}:`, processingMetrics);
-
-				// Handle processing failures for the current batch
-				if (processingMetrics.failed && processingMetrics.failed > 0) {
-					const errorRate = (processingMetrics.failed / processingMetrics.processed) * 100;
-					if (errorRate > 50) {
-						throw new Error(`High error rate detected for batch ${batchStartDate} to ${batchEndDate}: ${errorRate.toFixed(2)}% - manual intervention required`);
-					}
-				}
-			}
+			// Assuming the CSV file is named 'apod.csv' in the root of the R2 bucket
+			const r2CsvObjectKey = 'apod.csv'; 
+			console.log(`Starting embedding generation from R2 CSV: ${r2CsvObjectKey}`);
+			const processingMetrics = await processor.processR2CSVAndGenerateEmbeddings(r2CsvObjectKey);
+			console.log('Embedding generation complete:', processingMetrics);
 
 		} catch (error) {
 			const duration = Date.now() - startTime;
