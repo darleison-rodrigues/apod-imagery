@@ -31,16 +31,9 @@ jobs:
       # Step 3: Install project dependencies
       - name: Install Dependencies
         run: npm install
+        working-directory: ./workers/apodimagery
 
-      # Step 4: Build client assets
-      - name: Build Client Assets
-        run: npm run build:client
-
-      # Step 5: Run tests (Optional but recommended)
-      - name: Run Tests
-        run: echo "No tests configured. Add your test command here."
-
-      # Step 6: Deploy the Worker to Cloudflare's production environment
+      # Step 4: Deploy the Worker to Cloudflare's production environment
       - name: Deploy Worker to Cloudflare
         if: github.ref == 'refs/heads/main' # Ensure this step only runs for the main branch
         uses: cloudflare/wrangler-action@v3
@@ -48,5 +41,4 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           command: deploy
-
-      
+          workingDirectory: ./workers/apodimagery
