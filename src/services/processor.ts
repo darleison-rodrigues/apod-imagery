@@ -334,59 +334,7 @@ export class APODProcessor {
         return { ...this.metrics };
     }
 
-    /**
-     * Processes a CSV file from R2, generates embeddings, and updates D1.
-     * @param r2CsvObjectKey - The key of the CSV object in R2.
-     * @returns Promise<ProcessingMetrics> - Complete processing statistics.
-     */
-    async processR2CSVAndGenerateEmbeddings(r2CsvObjectKey: string): Promise<ProcessingMetrics> {
-        this.metrics = this.initializeMetrics(); // Reset metrics for this run
-
-        try {
-            // 1. Fetch CSV from R2
-            const csvBlob = await this.storage.getR2Object(r2CsvObjectKey);
-            if (!csvBlob) {
-                throw new Error(`CSV object not found in R2: ${r2CsvObjectKey}`);
-            }
-            const csvContent = await csvBlob.text();
-
-            // 2. Parse CSV content (simple parsing, assumes no complex escaped commas)
-            const lines = csvContent.split('\n').filter((line: string) => line.trim() !== '');
-            if (lines.length < 2) {
-                throw new Error('CSV must contain headers and at least one data row.');
-            }
-            const headers = lines[0].split(',').map((h: string) => h.trim().toLowerCase());
-
-            // 3. Process each row
-            const apodDataList: APODData[] = [];
-            for (let i = 1; i < lines.length; i++) {
-                const values = lines[i].split(',').map(v => v.trim());
-                const row: { [key: string]: string } = {};
-                headers.forEach((header: string | number, index: string | number) => {
-                    row[header] = values[index] || '';
-                });
-
-                // Map CSV row to APODData interface
-                apodDataList.push({
-                    date: row.date,
-                    title: row.title,
-                    explanation: row.explanation,
-                    url: row.url,
-                    media_type: row.media_type || 'image',
-                    hdurl: row.hdurl,
-                    copyright: row.copyright,
-                    service_version: row.service_version,
-                });
-            }
-
-            // Now process the APODDataList using the existing pipeline
-            return await this.processAPODData(apodDataList);
-
-        } catch (error) {
-            this.recordProcessingFailure({ date: 'N/A', url: 'N/A', title: 'N/A', explanation: 'N/A' }, `CSV processing failed: ${this.extractErrorMessage(error)}`);
-            throw error; // Re-throw to indicate overall failure
-        }
-    }
+    
 
     /**
      * Validates that all required services are properly initialized

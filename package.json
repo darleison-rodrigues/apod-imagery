@@ -1,5 +1,5 @@
 {
-  "name": "apod-classification-worker",
+  "name": "apodimagery",
   "version": "1.0.0",
   "description": "Cloudflare Worker for APOD image classification and storage",
   "main": "index.ts",

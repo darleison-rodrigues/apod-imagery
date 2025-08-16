@@ -195,81 +195,31 @@ export default {
 
 			const processor = new APODProcessor(env);
 
-			const r2CsvUrl = 'https://pub-59ec19944cea4f0689b805364aa998d8.r2.dev/apod_master_data.csv';
-            console.log(`Attempting to fetch CSV from: ${r2CsvUrl}`);
-            const response = await fetch(r2CsvUrl);
+			console.log('Checking APOD data count in D1...');
+			const { results: countResults } = await env.APOD_D1.prepare('SELECT COUNT(*) as count FROM apod_metadata_dev').all();
+			const rowCount = countResults && countResults.length > 0 ? (countResults[0] as any).count : 0;
 
-            console.log(`Fetch response status: ${response.status} ${response.statusText}`);
-            if (!response.ok) {
-                throw new Error(`Failed to fetch CSV from R2. Status: ${response.status}, StatusText: ${response.statusText}`);
-            }
-
-            const csvContent = await response.text();
-            console.log(`Successfully fetched CSV. Received content length: ${csvContent.length}`);
-
-            console.log('Starting CSV parsing...');
-            const lines = csvContent.split('\n')
-                .map(line => line.trim())
-                .filter(line => line.length > 0);
-            console.log(`CSV parsing complete. Found ${lines.length} lines.`);
-
-			if (lines.length < 2) {
-				throw new Error('CSV must contain headers and at least one data row.');
+			if (rowCount === 0) {
+				console.warn('No APOD data found in D1 (count is 0).');
+				return;
 			}
+			console.log(`Found ${rowCount} APOD items in D1. Fetching all data...`);
 
-			const headerLine = lines[0];
-			const headers = headerLine.split(',').map(h => h.trim().toLowerCase());
-			console.log('CSV Headers:', headers);
+			const { results } = await env.APOD_D1.prepare('SELECT * FROM apod_metadata_dev').all();
 
-			const apodDataList: APODData[] = [];
-			for (let i = 1; i < lines.length; i++) {
-				const line = lines[i];
-				const values = [];
-				let current = '';
-				let inQuotes = false;
+			const apodDataList: APODData[] = results.map((row: any) => ({
+				date: row.date,
+				title: row.title,
+				explanation: row.explanation,
+				url: row.image_url, // Assuming image_url in D1 maps to url in APODData
+				media_type: row.media_type || 'image',
+				hdurl: row.r2_url, // Assuming r2_url in D1 maps to hdurl in APODData
+				copyright: row.copyright,
+				service_version: row.service_version,
+				// Add other fields as necessary from your D1 schema
+			}));
 
-				for (let j = 0; j < line.length; j++) {
-					const char = line[j];
-					if (char === '"') {
-						inQuotes = !inQuotes;
-					} else if (char === ',' && !inQuotes) {
-						values.push(current.trim().replace(/^^"|"$/g, ''));
-						current = '';
-					} else {
-						current += char;
-					}
-				}
-				values.push(current.trim().replace(/^^"|"$/g, ''));
-
-				if (values.length !== headers.length) {
-					continue;
-				}
-
-				const row: { [key: string]: string } = {};
-				headers.forEach((header, index) => {
-					row[header] = values[index] || '';
-				});
-
-				// Map CSV row to APODData interface
-				const apodDataItem: APODData = {
-					date: row.date,
-					title: row.title,
-					explanation: row.explanation,
-					url: row.url,
-					media_type: row.media_type || 'image',
-					hdurl: row.hdurl,
-					copyright: row.copyright,
-					service_version: row.service_version,
-				};
-
-				// Validate required fields for APODData
-				if (!apodDataItem.date || !apodDataItem.url) {
-					console.warn(`Skipping row ${i + 1}: Missing required fields (date, url). Data: ${JSON.stringify(apodDataItem)}`);
-					continue;
-				}
-
-				apodDataList.push(apodDataItem);
-			}
+			console.log(`Successfully fetched ${apodDataList.length} APOD items from D1.`);
 
 			console.log(`Starting processing for ${apodDataList.length} APOD items.`);
 			const processingMetrics = await processor.processAPODData(apodDataList);
