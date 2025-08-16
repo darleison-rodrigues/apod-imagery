@@ -88,17 +88,17 @@ sequenceDiagram
 
 ```mermaid
 graph TD
-    A[APOD Data<br/>(Image + Text)] --> B{Multi-Modal Feature Extraction};
-    B --> C[Llava<br/>(Image Captioning)];
-    B --> D[Image Classification<br/>(e.g., ResNet)];
+    A[APOD Data<br/>] --> B{Multi-Modal Feature Extraction};
+    B --> C[Llava<br/>];
+    B --> D[Image Classification<br/>];
     B --> E[Text Summarization];
     
-    C --> F[Combined Text<br/>(Original + Llava + Summaries)];
+    C --> F[Combined Text<br/>];
     D --> F;
     E --> F;
     
-    F --> G[Text Embedding Model<br/>(e.g., BGE)];
-    G --> H{Quality Assurance<br/>(CelestialImageValidator)};
+    F --> G[Text Embedding Model<br/>];
+    G --> H{Quality Assurance<br/>};
     H --> I[Vector Database Storage];
 ```
 
