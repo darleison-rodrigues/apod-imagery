@@ -6,6 +6,8 @@
 
 This project implements a comprehensive, cloud-native system for processing and analyzing NASA's APOD archive. Built on Cloudflare Workers, it combines multiple AI models to generate semantic embeddings, classify astronomical content, and enable intelligent search across 25+ years of space imagery and descriptions.
 
+<img width="977" height="389" alt="image" src="https://github.com/user-attachments/assets/a3b6c46f-91d9-4c21-b46c-2f56fc56befc" />
+
 ## :sparkles: Key Features
 
 - **Production-Ready Pipeline**: Robust error handling, retry logic, and transactional data consistency
