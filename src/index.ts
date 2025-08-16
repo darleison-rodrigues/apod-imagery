@@ -76,7 +76,7 @@ export default {
 				// Prepare batch insert statements
 				const statements = dataToInsert.map(data =>
 					env.APOD_D1.prepare(
-						`INSERT INTO apod-metadata-dev (date, title, explanation, image_url, r2_url, category, confidence, image_description, copyright, is_relevant)
+						`INSERT INTO apod_metadata_dev (date, title, explanation, image_url, r2_url, category, confidence, image_description, copyright, is_relevant)
                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                          ON CONFLICT(date) DO UPDATE SET
                             title = EXCLUDED.title,

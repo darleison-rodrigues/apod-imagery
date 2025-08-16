@@ -16,6 +16,7 @@ binding = "AI"
 binding = "APOD_D1"
 database_name = "apod-metadata-dev"
 database_id = "115747db-5068-480e-b940-535053fd1df7"
+migrations_dir = "src/migrations"
 
 # R2 Storage binding for image files
 [[r2_buckets]]
