@@ -160,62 +160,6 @@ interface ProcessingMetrics {
 }
 ```
 
-### Known Limitations & Improvements Needed
-
-**⚠️ Critical Areas for Enhancement:**
-
-1. **Classification Model**: Current DistilBERT model is designed for sentiment analysis, not astronomical content
-   ```typescript
-   // Current simplistic filtering - needs improvement
-   private isCelestialObject(category: string): boolean {
-     const celestialCategories = ["Galaxy", "Nebula", "Star Cluster", "Planet", "Comet", "Asteroid", "Supernova", "Black Hole"];
-     return celestialCategories.includes(category);
-   }
-   ```
-
-2. **Model Performance Metrics**: Need to implement:
-   - Precision@K and Recall@K for search relevance
-   - BLEU/ROUGE scores for caption quality
-   - Classification accuracy on astronomical content
-
-3. **Monitoring Gaps**: Missing observability for:
-   - Embedding cluster quality
-   - Search result relevance tracking
-   - Model drift detection
-
-## :rocket: Performance & Scalability
-
-### Current Performance Characteristics
-
-- **Processing Rate**: ~2-5 items/second (configurable)
-- **Error Recovery**: 3-attempt retry with exponential backoff
-- **Concurrency Control**: Semaphore-based limiting prevents resource exhaustion
-- **Memory Efficiency**: Streaming image processing without full buffering
-
-### Scalability Features
-
-```typescript
-// Configurable batch processing
-private async processBatchWithConcurrency(batch: APODData[]): Promise<void> {
-  const semaphore = new Semaphore(this.maxConcurrent);
-  // Prevents overwhelming Cloudflare AI with too many concurrent requests
-}
-
-// Transactional storage with rollback
-private async storeAPODData(...): Promise<void> {
-  try {
-    await this.env.APOD_R2.put(r2Key, imageBlob);
-    await db.prepare(INSERT_QUERY).run();
-    await this.env.VECTORIZE_INDEX.upsert([vector]);
-  } catch (error) {
-    // Automatic cleanup on failure
-    await this.env.APOD_R2.delete(r2Key).catch(() => {});
-    await db.prepare(DELETE_QUERY).run().catch(() => {});
-    throw error;
-  }
-}
-```
-
 ## :warning: Production Considerations
 
 ### Security & Compliance

@@ -1,4 +1,4 @@
-interface ValidationResult {
+export interface ValidationResult {
 	isValid: boolean;
 	category: string | null;
 	confidence: number;
@@ -6,7 +6,7 @@ interface ValidationResult {
 	reasons: string[];
 }
 
-class CelestialImageValidator {
+export class CelestialImageValidator {
 	private readonly astronomicalCategories = {
 		// Deep Space Objects
 		deepSpace: [

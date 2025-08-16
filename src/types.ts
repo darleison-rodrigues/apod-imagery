@@ -305,3 +305,58 @@ export interface ConfigValidation {
 	/** Validated configuration object */
 	config?: ProcessingConfig;
 }
+
+export class EnhancedRateLimiter {
+	private consecutiveFailures: number = 0;
+	private lastRequestTime: number = 0;
+	private readonly baseDelay: number;
+	private readonly maxDelay: number;
+
+	constructor(baseDelay: number = 1000, maxDelay: number = 300000) {
+		this.baseDelay = baseDelay;
+		this.maxDelay = maxDelay;
+	}
+
+	async waitBeforeRequest(): Promise<void> {
+		const currentTime = Date.now();
+		const timeSinceLastRequest = currentTime - this.lastRequestTime;
+		
+		let delay = this.baseDelay;
+		
+		// Apply exponential backoff if there have been consecutive failures
+		if (this.consecutiveFailures > 0) {
+			delay = Math.min(
+				this.baseDelay * Math.pow(2, this.consecutiveFailures),
+				this.maxDelay
+			);
+			// Add jitter to prevent thundering herd
+			delay += Math.random() * (delay * 0.1);
+		}
+
+		// Ensure minimum time between requests
+		if (timeSinceLastRequest < delay) {
+			const sleepTime = delay - timeSinceLastRequest;
+			await new Promise(resolve => setTimeout(resolve, sleepTime));
+		}
+
+		this.lastRequestTime = Date.now();
+	}
+
+	handleSuccess(): void {
+		this.consecutiveFailures = 0;
+	}
+
+	handleFailure(): void {
+		this.consecutiveFailures++;
+	}
+
+	async handleRateLimit(): Promise<void> {
+		this.consecutiveFailures++;
+		const delay = Math.min(
+			this.baseDelay * Math.pow(2, this.consecutiveFailures),
+			this.maxDelay
+		);
+		console.log(`Rate limit hit. Waiting ${delay}ms (attempt ${this.consecutiveFailures})`);
+		await new Promise(resolve => setTimeout(resolve, delay));
+	}
+}
