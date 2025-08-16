@@ -79,16 +79,16 @@ export default {
 						`INSERT INTO apod_metadata_dev (date, title, explanation, image_url, r2_url, category, confidence, image_description, copyright, is_relevant)
                          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);`,
 						[
-							data.date,
-							data.title,
-							data.explanation,
-							data.image_url,
-							data.r2_url,
-							data.category,
-							data.confidence,
-							data.image_description,
-							data.copyright,
-							data.is_relevant,
+							String(data.date || ''), // Ensure string
+							String(data.title || ''), // Ensure string
+							String(data.explanation || ''), // Ensure string
+							String(data.image_url || ''), // Ensure string
+							String(data.r2_url || ''), // Ensure string
+							data.category === undefined ? null : String(data.category), // Ensure string or null
+							data.confidence === undefined ? null : Number(data.confidence), // Ensure number or null
+							data.image_description === undefined ? null : String(data.image_description), // Ensure string or null
+							data.copyright === undefined ? null : String(data.copyright), // Ensure string or null
+							data.is_relevant === undefined ? 0 : Number(data.is_relevant), // Ensure number or 0
 						]
 					)
 				);
