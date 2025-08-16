@@ -252,7 +252,7 @@ export default {
 				});
 
 				// Map CSV row to APODData interface
-				apodDataList.push({
+				const apodDataItem: APODData = {
 					date: row.date,
 					title: row.title,
 					explanation: row.explanation,
@@ -261,7 +261,15 @@ export default {
 					hdurl: row.hdurl,
 					copyright: row.copyright,
 					service_version: row.service_version,
-				});
+				};
+
+				// Validate required fields for APODData
+				if (!apodDataItem.date || !apodDataItem.url) {
+					console.warn(`Skipping row ${i + 1}: Missing required fields (date, url). Data: ${JSON.stringify(apodDataItem)}`);
+					continue;
+				}
+
+				apodDataList.push(apodDataItem);
 			}
 
 			console.log(`Starting processing for ${apodDataList.length} APOD items.`);

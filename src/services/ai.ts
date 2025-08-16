@@ -17,6 +17,7 @@ export class AIService {
 	 * @returns Promise<ClassificationResult> - Complete classification results
 	 */
 	async classifyAPOD(apodData: APODData, imageBlob: Blob): Promise<ClassificationResult> {
+		console.log(`Classifying APOD for date: ${apodData.date}`);
 		const combinedText = `${apodData.title}. ${apodData.explanation}`;
 		
 		try {
@@ -30,15 +31,17 @@ export class AIService {
 
 			const validationResult = this.validator.validateCelestialImage(apodData.title, apodData.explanation);
 
-			return {
+			const result: ClassificationResult = {
 				category: primaryCategory,
 				confidence: textClassification[0]?.score || 0,
 				imageDescription: imageAnalysis.description || 'Unable to generate description',
 				embeddings: textEmbeddings,
 				isRelevant: validationResult.isValid,
 			};
+			console.log(`Classification successful for date: ${apodData.date}. Is Relevant: ${result.isRelevant}`);
+			return result;
 		} catch (error) {
-			console.error('Classification failed:', error);
+			console.error(`Classification failed for date: ${apodData.date}. Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
 			throw new Error(`APOD classification failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
 		}
 	}
@@ -52,21 +55,27 @@ export class AIService {
 	 */
 	private async analyzeImage(imageBlob: Blob): Promise<any> {
 		const model = '@cf/llava-hf/llava-1.5-7b-hf';
-		const imageArray = new Uint8Array(await imageBlob.arrayBuffer());
-		
-		const analysisPrompt = [
-			'Analyze this astronomical image in detail.',
-			'Identify celestial objects, cosmic phenomena, and structural features.',
-			'Describe colors, brightness patterns, and spatial relationships.',
-			'Note any telescopic or observational characteristics visible.'
-		].join(' ');
+		try {
+			const imageArray = new Uint8Array(await imageBlob.arrayBuffer());
+			
+			const analysisPrompt = [
+				'Analyze this astronomical image in detail.',
+				'Identify celestial objects, cosmic phenomena, and structural features.',
+				'Describe colors, brightness patterns, and spatial relationships.',
+				'Note any telescopic or observational characteristics visible.'
+			].join(' ');
 
-		const inputs = {
-			prompt: analysisPrompt,
-			image: [...imageArray],
-		};
+			const inputs = {
+				prompt: analysisPrompt,
+				image: [...imageArray],
+			};
 
-		return await this.ai.run(model, inputs);
+			const result = await this.ai.run(model, inputs);
+			return result;
+		} catch (error) {
+			console.error(`Image analysis with ${model} failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+			throw error;
+		}
 	}
 
 	/**
@@ -76,11 +85,16 @@ export class AIService {
 	 */
 	private async classifyText(text: string): Promise<any> {
 		const model = '@cf/huggingface/distilbert-sst-2-int8';
-		
-		// Preprocess text for better classification accuracy
-		const processedText = this.preprocessTextForClassification(text);
-		
-		return await this.ai.run(model, { text: processedText });
+		try {
+			// Preprocess text for better classification accuracy
+			const processedText = this.preprocessTextForClassification(text);
+			
+			const result = await this.ai.run(model, { text: processedText });
+			return result;
+		} catch (error) {
+			console.error(`Text classification with ${model} failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+			throw error;
+		}
 	}
 
 	/**
@@ -89,12 +103,16 @@ export class AIService {
 	 * @returns Promise<number[]> - Vector embeddings array
 	 */	public async generateEmbeddings(text: string): Promise<number[]> {
 		const model = '@cf/baai/bge-base-en-v1.5';
-		
-		// Clean and optimize text for embedding generation
-		const optimizedText = this.optimizeTextForEmbedding(text);
-		
-		const result = await this.ai.run(model, { text: [optimizedText] });
-		return result.data[0];
+		try {
+			// Clean and optimize text for embedding generation
+			const optimizedText = this.optimizeTextForEmbedding(text);
+			
+			const result = await this.ai.run(model, { text: [optimizedText] });
+			return result.data[0];
+		} catch (error) {
+			console.error(`Embedding generation with ${model} failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+			throw error;
+		}
 	}
 
 	/**
