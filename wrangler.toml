@@ -15,7 +15,7 @@ binding = "AI"
 [[d1_databases]]
 binding = "APOD_D1"
 database_name = "apod-metadata"
-database_id = "115747db-5068-480e-b940-535053fd1df7 "
+database_id = "115747db-5068-480e-b940-535053fd1df7"
 
 # R2 Storage binding for image files
 [[r2_buckets]]
