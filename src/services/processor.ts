@@ -15,7 +15,7 @@ export class APODProcessor {
 	constructor(env: Env) {
 		this.ai = new AIService(env.AI);
 		this.storage = new StorageService(env);
-		this.db = env.DB;
+		this.db = env.APOD_D1;
 		this.vectorizeIndex = env.VECTORIZE_INDEX; // Initialize Vectorize binding
 		this.metrics = this.initializeMetrics();
 		this.config = this.loadConfiguration(env);
@@ -225,7 +225,7 @@ export class APODProcessor {
 	 * Loads configuration from environment variables with validation
 	 * @param env - Environment object containing configuration
 	 * @returns ProcessingConfig - Validated configuration object
-	 */
+	 */	
 	private loadConfiguration(env: Env): ProcessingConfig {
 		const config = {
 			maxConcurrent: this.parseIntegerConfig(env.MAX_CONCURRENT_PROCESSING, 5, 1, 50),
@@ -341,64 +341,41 @@ export class APODProcessor {
             const csvContent = await csvBlob.text();
 
             // 2. Parse CSV content (simple parsing, assumes no complex escaped commas)
-            const lines = csvContent.split('\n').filter(line => line.trim() !== '');
+            const lines = csvContent.split('\n').filter((line: string) => line.trim() !== '');
             if (lines.length < 2) {
                 throw new Error('CSV must contain headers and at least one data row.');
             }
-            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+            const headers = lines[0].split(',').map((h: string) => h.trim().toLowerCase());
 
             // 3. Process each row
+            const apodDataList: APODData[] = [];
             for (let i = 1; i < lines.length; i++) {
                 const values = lines[i].split(',').map(v => v.trim());
                 const row: { [key: string]: string } = {};
-                headers.forEach((header, index) => {
+                headers.forEach((header: string | number, index: string | number) => {
                     row[header] = values[index] || '';
                 });
 
-                const date = row.date;
-                if (!date) {
-                    console.warn(`Skipping row ${i + 1}: Missing date.`);
-                    this.metrics.skipped++;
-                    continue;
-                }
-
-                // 4. Fetch existing data from D1
-                const existingRecord = await this.db.prepare('SELECT * FROM apod_metadata_dev WHERE date = ?').bind(date).first();
-
-                if (existingRecord) {
-                    // 5. Generate embeddings for existing record
-                    const combinedText = `${existingRecord.title}. ${existingRecord.explanation}`;
-                    try {
-                        const embeddings = await this.ai.generateEmbeddings(combinedText);
-
-                        // 6. Upsert embeddings to Vectorize
-						await this.vectorizeIndex.upsert([{
-							id: date, // Use date as the ID for the embedding
-							values: embeddings,
-							metadata: {
-								date: existingRecord.date,
-								title: existingRecord.title,
-								category: existingRecord.category,
-								is_relevant: existingRecord.is_relevant,
-							}
-						}]);
-
-						this.metrics.processed++;
-						this.metrics.relevant++; // Assuming all D1 records are relevant for embedding generation
-                    } catch (embeddingError) {
-                        this.recordProcessingFailure({ date: date, url: existingRecord.image_url, title: existingRecord.title, explanation: existingRecord.explanation }, `Embedding generation failed: ${this.extractErrorMessage(embeddingError)}`);
-                    }
-                } else {
-                    console.warn(`Skipping row ${i + 1}: Record for date ${date} not found in D1. Cannot generate embeddings.`);
-                    this.metrics.skipped++;
-                }
+                // Map CSV row to APODData interface
+                apodDataList.push({
+                    date: row.date,
+                    title: row.title,
+                    explanation: row.explanation,
+                    url: row.url,
+                    media_type: row.media_type || 'image',
+                    hdurl: row.hdurl,
+                    copyright: row.copyright,
+                    service_version: row.service_version,
+                });
             }
+
+            // Now process the APODDataList using the existing pipeline
+            return await this.processAPODData(apodDataList);
+
         } catch (error) {
             this.recordProcessingFailure({ date: 'N/A', url: 'N/A', title: 'N/A', explanation: 'N/A' }, `CSV processing failed: ${this.extractErrorMessage(error)}`);
             throw error; // Re-throw to indicate overall failure
         }
-
-        return this.finalizeProcessing();
     }
 
     /**

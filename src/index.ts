@@ -1,35 +1,5 @@
 import { APODProcessor } from './services/processor';
 import { Env, APODData } from './types';
-import { Semaphore } from './utils/semaphore';
-
-// Define a semaphore for NASA API calls
-const nasaApiSemaphore = new Semaphore(1); // Limit to 1 concurrent call for now, can be configured
-
-/**
- * Fetches APOD data from the NASA API.
- *
- * @param apiKey - The NASA API key.
- * @returns A promise that resolves to an array of APOD data.
- */
-async function fetchAPODData(apiKey: string, startDate: string, endDate: string): Promise<APODData[]> {
-	if (!apiKey) {
-		throw new Error('NASA_API_KEY is not defined');
-	}
-
-	// Acquire a permit from the semaphore before making the API call
-	await nasaApiSemaphore.acquire();
-	try {
-		const response = await fetch(`https://api.nasa.gov/planetary/apod?api_key=${apiKey}&start_date=${startDate}&end_date=${endDate}`);
-		if (!response.ok) {
-			throw new Error(`Failed to fetch APOD data: ${response.statusText}`);
-		}
-
-		return response.json();
-	} finally {
-		// Release the permit after the API call (whether successful or not)
-		nasaApiSemaphore.release();
-	}
-}
 
 /**
  * Cloudflare Worker for processing NASA Astronomy Picture of the Day (APOD) data
@@ -75,13 +45,13 @@ export default {
 							if (char === '"') {
 								inQuotes = !inQuotes;
 							} else if (char === ',' && !inQuotes) {
-								values.push(current.trim().replace(/^"|"$/g, ''));
+								values.push(current.trim().replace(/^^"|"$/g, ''));
 								current = '';
 							} else {
 								current += char;
 							}
 						}
-						values.push(current.trim().replace(/^"|"$/g, '')); // Don't forget the last value
+						values.push(current.trim().replace(/^^"|"$/g, '')); // Don't forget the last value
 
 						if (values.length !== headers.length) {
 							errors.push(`Row ${i + 1}: Column count mismatch. Expected ${headers.length}, got ${values.length}`);
@@ -228,11 +198,75 @@ export default {
 
 			const processor = new APODProcessor(env);
 
-			// Assuming the CSV file is named 'apod.csv' in the root of the R2 bucket
-			const r2CsvObjectKey = 'apod.csv'; 
-			console.log(`Starting embedding generation from R2 CSV: ${r2CsvObjectKey}`);
-			const processingMetrics = await processor.processR2CSVAndGenerateEmbeddings(r2CsvObjectKey);
-			console.log('Embedding generation complete:', processingMetrics);
+			const r2CsvUrl = 'https://pub-59ec19944cea4f0689b805364aa998d8.r2.dev/apod_master_data.csv';
+			console.log(`Fetching CSV from: ${r2CsvUrl}`);
+			const response = await fetch(r2CsvUrl);
+
+			if (!response.ok) {
+				throw new Error(`Failed to fetch CSV from R2: ${response.statusText}`);
+			}
+
+			const csvContent = await response.text();
+			console.log('Received CSV content length:', csvContent.length);
+
+			const lines = csvContent.split('\n')
+				.map(line => line.trim())
+				.filter(line => line.length > 0);
+
+			if (lines.length < 2) {
+				throw new Error('CSV must contain headers and at least one data row.');
+			}
+
+			const headerLine = lines[0];
+			const headers = headerLine.split(',').map(h => h.trim().toLowerCase());
+			console.log('CSV Headers:', headers);
+
+			const apodDataList: APODData[] = [];
+			for (let i = 1; i < lines.length; i++) {
+				const line = lines[i];
+				const values = [];
+				let current = '';
+				let inQuotes = false;
+
+				for (let j = 0; j < line.length; j++) {
+					const char = line[j];
+					if (char === '"') {
+						inQuotes = !inQuotes;
+					} else if (char === ',' && !inQuotes) {
+						values.push(current.trim().replace(/^^"|"$/g, ''));
+						current = '';
+					} else {
+						current += char;
+					}
+				}
+				values.push(current.trim().replace(/^^"|"$/g, ''));
+
+				if (values.length !== headers.length) {
+					console.warn(`Row ${i + 1}: Column count mismatch. Expected ${headers.length}, got ${values.length}. Skipping row.`);
+					continue;
+				}
+
+				const row: { [key: string]: string } = {};
+				headers.forEach((header, index) => {
+					row[header] = values[index] || '';
+				});
+
+				// Map CSV row to APODData interface
+				apodDataList.push({
+					date: row.date,
+					title: row.title,
+					explanation: row.explanation,
+					url: row.url,
+					media_type: row.media_type || 'image',
+					hdurl: row.hdurl,
+					copyright: row.copyright,
+					service_version: row.service_version,
+				});
+			}
+
+			console.log(`Starting processing for ${apodDataList.length} APOD items.`);
+			const processingMetrics = await processor.processAPODData(apodDataList);
+			console.log('APOD processing complete:', processingMetrics);
 
 		} catch (error) {
 			const duration = Date.now() - startTime;

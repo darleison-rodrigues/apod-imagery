@@ -3,8 +3,7 @@ CREATE TABLE IF NOT EXISTS apod_metadata_dev (
     date TEXT PRIMARY KEY,
     title TEXT NOT NULL,
     explanation TEXT NOT NULL,
-    image_url TEXT N
-    OT NULL,
+    image_url TEXT NOT NULL,
     r2_url TEXT NOT NULL,
     category TEXT,
     confidence REAL,

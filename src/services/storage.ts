@@ -8,6 +8,21 @@ export class StorageService {
 	}
 
 	/**
+	 * Retrieves an object from R2.
+	 * @param key - The key of the object to retrieve.
+	 * @returns Promise<R2ObjectBody | null> - The R2 object body or null if not found.
+	 */
+	async getR2Object(key: string): Promise<R2ObjectBody | null> {
+		try {
+			const object = await this.env.APOD_R2.get(key);
+			return object;
+		} catch (error) {
+			console.error(`Failed to retrieve R2 object ${key}:`, error);
+			return null;
+		}
+	}
+
+	/**
 	 * Stores complete APOD data including image, metadata, and vector embeddings
 	 * @param apodData - APOD data to store
 	 * @param result - Classification results with embeddings
