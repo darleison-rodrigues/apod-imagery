@@ -4,68 +4,15 @@ import { APODMetadata, Env } from './types';
 async function processAPODRecord(apodRecord: APODMetadata, env: Env): Promise<void> {
     console.log(`Processing APOD record for date: ${apodRecord.date}`);
 
-    // Step 1: Fetch image and generate description using Llava
-    let imageDescription = "";
-    if (apodRecord.image_url) {
-        try {
-            const imageResponse = await fetch(apodRecord.image_url);
-            const imageArrayBuffer = await imageResponse.arrayBuffer();
-            const analysisPrompt = [
-                'Analyze this astronomical image in detail.',
-                'Identify celestial objects, cosmic phenomena, and structural features.',
-                'Describe colors, brightness patterns, and spatial relationships.',
-                'Note any telescopic or observational characteristics visible.',
-            ].join(' ');
-            const llavaResponse = await env.AI.run(
-                "@cf/llava-hf/llava-1.5-7b-hf",
-                {
-                    image: [...new Uint8Array(imageArrayBuffer)],
-                    prompt: analysisPrompt,
-                }
-            );
-            
-            imageDescription = llavaResponse.description || "";
-            console.log(`Llava description for ${apodRecord.date}: ${imageDescription.substring(0, 100)}...`);
-        } catch (imageError) {
-            console.warn(`Could not generate Llava description for ${apodRecord.date}: ${imageError}`);
-            imageDescription = `(Image description failed: ${imageError})`;
-        }
-    }
-
     // Step 2: Generate embeddings using Workers AI
-    const textToEmbed = `${apodRecord.title}. ${apodRecord.explanation}. ${imageDescription}`;
+    const textToEmbed = `${apodRecord.title}. ${apodRecord.explanation}`;
     
     const embeddingsResponse = await env.AI.run(
         "@cf/baai/bge-base-en-v1.5",
         { text: textToEmbed }
     );
-
-    // Handle embeddings response - check for async response first
-    if ('request_id' in embeddingsResponse) {
-        throw new Error(`Received async response with request_id: ${embeddingsResponse.request_id}. Async processing not implemented.`);
-    }
-
-    // Validate embeddings response structure
-    if (!embeddingsResponse.data || !Array.isArray(embeddingsResponse.data)) {
-        throw new Error(`Invalid embeddings response structure - missing or invalid data array: ${JSON.stringify(embeddingsResponse)}`);
-    }
-
-    if (embeddingsResponse.data.length === 0) {
-        throw new Error(`Empty embeddings data array: ${JSON.stringify(embeddingsResponse)}`);
-    }
-
-    // Extract the first (and likely only) embedding array
     const embeddings = embeddingsResponse.data[0];
 
-    if (!Array.isArray(embeddings)) {
-        throw new Error(`Unexpected embeddings format - expected array but got: ${typeof embeddings}`);
-    }
-
-    if (embeddings.length === 0) {
-        throw new Error(`Empty embeddings array for ${apodRecord.date}`);
-    }
-
-    console.log(`Generated embeddings with ${embeddings.length} dimensions for ${apodRecord.date}`);
 
     // Step 3: Insert embeddings into Vectorize index (using insert instead of upsert)
     try {
