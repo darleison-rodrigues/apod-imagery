@@ -3,6 +3,7 @@ main = "src/index.ts"
 compatibility_date = "2024-08-15"
 compatibility_flags = ["nodejs_compat"]
 
+
 # AI binding for machine learning models
 [ai]
 binding = "AI"
@@ -44,11 +45,6 @@ index_name = "apod_img_embeddings"
 # CLIP models typically output 512-dimensional embeddings
 # You might need to adjust this based on the specific CLIP model used
 dimensions = 512
-
-# Durable Objects binding for the workflow
-[[durable_objects]]
-binding = "VECTORIZE_WORKFLOW"
-class_name = "VectorizeWorkflow"
 
 # Environment variables
 [vars]
