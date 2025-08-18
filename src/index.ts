@@ -40,14 +40,34 @@ async function processAPODRecord(apodRecord: APODMetadata, env: Env): Promise<vo
         { text: textToEmbed }
     );
 
-    // Handle embeddings response
-    const embeddings = embeddingsResponse.data?.[0];
+    // Handle embeddings response - check for async response first
+    if ('request_id' in embeddingsResponse) {
+        throw new Error(`Received async response with request_id: ${embeddingsResponse.request_id}. Async processing not implemented.`);
+    }
+
+    // Validate embeddings response structure
+    if (!embeddingsResponse.data || !Array.isArray(embeddingsResponse.data)) {
+        throw new Error(`Invalid embeddings response structure - missing or invalid data array: ${JSON.stringify(embeddingsResponse)}`);
+    }
+
+    if (embeddingsResponse.data.length === 0) {
+        throw new Error(`Empty embeddings data array: ${JSON.stringify(embeddingsResponse)}`);
+    }
+
+    // Extract the first (and likely only) embedding array
+    const embeddings = embeddingsResponse.data[0];
 
     if (!Array.isArray(embeddings)) {
-        throw new Error(`Unexpected or invalid embeddings response structure: ${JSON.stringify(embeddingsResponse)}`);
+        throw new Error(`Unexpected embeddings format - expected array but got: ${typeof embeddings}`);
+    }
+
+    if (embeddings.length === 0) {
+        throw new Error(`Empty embeddings array for ${apodRecord.date}`);
     }
 
     console.log(`Generated embeddings with ${embeddings.length} dimensions for ${apodRecord.date}`);
+    console.log(`Response shape: ${embeddingsResponse.shape || 'not provided'}`);
+    console.log(`Pooling method: ${embeddingsResponse.pooling || 'not provided'}`);
 
     // Step 3: Upsert embeddings into Vectorize index
     await env.APOD_BASE_768D_VECTORIZE.upsert({
