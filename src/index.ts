@@ -28,9 +28,7 @@ async function processAPODRecord(apodRecord: APODMetadata, env: Env): Promise<vo
                 },
             }
         ]);
-        console.log(`Text embeddings inserted for APOD date: ${apodRecord.date}`);
     } catch (vectorError) {
-        console.error(`Vectorize insert failed for ${apodRecord.date}:`, vectorError);
         // Try upsert as fallback
         try {
             await env.APOD_BASE_768D_VECTORIZE.upsert([
@@ -45,9 +43,7 @@ async function processAPODRecord(apodRecord: APODMetadata, env: Env): Promise<vo
                     },
                 }
             ]);
-            console.log(`Text embeddings upserted (fallback) for APOD date: ${apodRecord.date}`);
         } catch (upsertError) {
-            console.error(`Both insert and upsert failed for ${apodRecord.date}:`, upsertError);
             throw upsertError;
         }
     }
@@ -58,7 +54,6 @@ async function processAPODRecord(apodRecord: APODMetadata, env: Env): Promise<vo
         .bind(new Date().toISOString(), apodRecord.date)
         .run();
 
-    console.log(`APOD record ${apodRecord.date} marked as processed in D1.`);
 }
 
 async function handleProcessing(env: Env): Promise<Response> {
@@ -84,7 +79,6 @@ async function handleProcessing(env: Env): Promise<Response> {
             .all<APODMetadata>();
 
         if (results && results.length > 0) {
-            console.log(`Found ${results.length} unprocessed APOD records to process`);
             
             let processedCount = 0;
             let errorCount = 0;
@@ -96,18 +90,15 @@ async function handleProcessing(env: Env): Promise<Response> {
                 try {
                     // Validate required fields
                     if (!apodRecord.date) {
-                        console.error(`APOD record at index ${i} missing required date field`);
                         errorCount++;
                         continue;
                     }
 
-                    console.log(`Processing record ${i + 1}/${results.length}: ${apodRecord.date}`);
                     
                     // Process the APOD record
                     await processAPODRecord(apodRecord, env);
                     processedCount++;
                     
-                    console.log(`✅ Successfully processed ${apodRecord.date} (${i + 1}/${results.length})`);
                     
                     // Add a small delay to avoid rate limiting
                     if (i < results.length - 1) {
