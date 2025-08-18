@@ -10,12 +10,12 @@ async function processAPODRecord(apodRecord: APODMetadata, env: Env): Promise<vo
         try {
             const imageResponse = await fetch(apodRecord.image_url);
             const imageArrayBuffer = await imageResponse.arrayBuffer();
-			const analysisPrompt = [
-				'Analyze this astronomical image in detail.',
-				'Identify celestial objects, cosmic phenomena, and structural features.',
-				'Describe colors, brightness patterns, and spatial relationships.',
-				'Note any telescopic or observational characteristics visible.',
-			].join(' ');
+            const analysisPrompt = [
+                'Analyze this astronomical image in detail.',
+                'Identify celestial objects, cosmic phenomena, and structural features.',
+                'Describe colors, brightness patterns, and spatial relationships.',
+                'Note any telescopic or observational characteristics visible.',
+            ].join(' ');
             const llavaResponse = await env.AI.run(
                 "@cf/llava-hf/llava-1.5-7b-hf",
                 {
@@ -66,24 +66,44 @@ async function processAPODRecord(apodRecord: APODMetadata, env: Env): Promise<vo
     }
 
     console.log(`Generated embeddings with ${embeddings.length} dimensions for ${apodRecord.date}`);
-    console.log(`Response shape: ${embeddingsResponse.shape || 'not provided'}`);
-    console.log(`Pooling method: ${embeddingsResponse.pooling || 'not provided'}`);
 
-    // Step 3: Upsert embeddings into Vectorize index
-    await env.APOD_BASE_768D_VECTORIZE.upsert([
-        {
-            id: apodRecord.date,
-            values: embeddings,
-            metadata: {
-                date: apodRecord.date,
-                title: apodRecord.title,
-                category: apodRecord.category,
-                confidence: apodRecord.confidence,
-            },
+    // Step 3: Insert embeddings into Vectorize index (using insert instead of upsert)
+    try {
+        await env.APOD_BASE_768D_VECTORIZE.insert([
+            {
+                id: apodRecord.date,
+                values: embeddings,
+                metadata: {
+                    date: apodRecord.date,
+                    title: apodRecord.title,
+                    category: apodRecord.category,
+                    confidence: apodRecord.confidence,
+                },
+            }
+        ]);
+        console.log(`Text embeddings inserted for APOD date: ${apodRecord.date}`);
+    } catch (vectorError) {
+        console.error(`Vectorize insert failed for ${apodRecord.date}:`, vectorError);
+        // Try upsert as fallback
+        try {
+            await env.APOD_BASE_768D_VECTORIZE.upsert([
+                {
+                    id: apodRecord.date,
+                    values: embeddings,
+                    metadata: {
+                        date: apodRecord.date,
+                        title: apodRecord.title,
+                        category: apodRecord.category,
+                        confidence: apodRecord.confidence,
+                    },
+                }
+            ]);
+            console.log(`Text embeddings upserted (fallback) for APOD date: ${apodRecord.date}`);
+        } catch (upsertError) {
+            console.error(`Both insert and upsert failed for ${apodRecord.date}:`, upsertError);
+            throw upsertError;
         }
-    ])
-
-    console.log(`Text embeddings upserted for APOD date: ${apodRecord.date}`);
+    }
 
     // Step 4: Update D1 database to mark as processed
     await env.APOD_D1
@@ -109,37 +129,72 @@ async function handleProcessing(env: Env): Promise<Response> {
             throw new Error("Vectorize binding (APOD_BASE_768D_VECTORIZE) is not configured");
         }
 
-        // Find the latest unprocessed APOD entry
+        // Find unprocessed APOD entries (batch processing)
+        const batchSize = 50; // Process 50 records at a time to avoid timeouts
         const { results } = await env.APOD_D1
-                .prepare("SELECT * FROM apod_metadata_dev ORDER BY date DESC LIMIT 1")
-                .all<APODMetadata>();
+            .prepare("SELECT * FROM apod_metadata_dev WHERE processed_at IS NOT NULL ORDER BY date DESC LIMIT ?")
+            .bind(batchSize)
+            .all<APODMetadata>();
 
         if (results && results.length > 0) {
-            const apodRecord = results[0];
+            console.log(`Found ${results.length} unprocessed APOD records to process`);
             
-            // Validate required fields
-            if (!apodRecord.date) {
-                throw new Error("APOD record missing required date field");
+            let processedCount = 0;
+            let errorCount = 0;
+
+            // Process each record in the batch
+            for (let i = 0; i < results.length; i++) {
+                const apodRecord = results[i];
+                
+                try {
+                    // Validate required fields
+                    if (!apodRecord.date) {
+                        console.error(`APOD record at index ${i} missing required date field`);
+                        errorCount++;
+                        continue;
+                    }
+
+                    console.log(`Processing record ${i + 1}/${results.length}: ${apodRecord.date}`);
+                    
+                    // Process the APOD record
+                    await processAPODRecord(apodRecord, env);
+                    processedCount++;
+                    
+                    console.log(`✅ Successfully processed ${apodRecord.date} (${i + 1}/${results.length})`);
+                    
+                    // Add a small delay to avoid rate limiting
+                    if (i < results.length - 1) {
+                        await new Promise(resolve => setTimeout(resolve, 100));
+                    }
+                    
+                } catch (recordError) {
+                    errorCount++;
+                    const errorMessage = recordError instanceof Error ? recordError.message : String(recordError);
+                    console.error(`❌ Failed to process ${apodRecord.date}: ${errorMessage}`);
+                    
+                    // Continue processing other records even if one fails
+                    continue;
+                }
             }
 
-            // Process the APOD record directly
-            await processAPODRecord(apodRecord, env);
-
-            return new Response(`Successfully processed APOD record: ${apodRecord.date}`, { status: 200 });
+            const summary = `Batch processing complete. Processed: ${processedCount}, Errors: ${errorCount}, Total attempted: ${results.length}`;
+            console.log(summary);
+            return new Response(summary, { status: 200 });
+            
         } else {
-            console.log("No new APOD entries to process.");
-            return new Response("No new APOD entries to process.", { status: 200 });
+            console.log("No unprocessed APOD entries found.");
+            return new Response("No unprocessed APOD entries found.", { status: 200 });
         }
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        console.error("Error during processing:", errorMessage);
-        return new Response(`Error during processing: ${errorMessage}`, { status: 500 });
+        console.error("Error during batch processing:", errorMessage);
+        return new Response(`Error during batch processing: ${errorMessage}`, { status: 500 });
     }
 }
 
 export default {
     async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-        console.log(`Fetch trigger fired at ${new Date().toISOString()}`);
+        console.log(`Batch processing triggered at ${new Date().toISOString()}`);
         return handleProcessing(env);
     }
 };
