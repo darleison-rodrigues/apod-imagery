@@ -77,7 +77,7 @@ export class StorageService {
 		
 		try {
 			const result = await this.env.APOD_D1.prepare(`
-				SELECT * FROM apod_metadata WHERE date = ?
+				SELECT * FROM apod_metadata_dev WHERE date = ?
 			`).bind(date).first();
 			
 			return result || null;

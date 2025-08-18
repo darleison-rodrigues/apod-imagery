@@ -20,31 +20,13 @@ migrations_dir = "src/migrations"
 binding = "APOD_R2"
 bucket_name = "apod-images-dev"
 
-# Vectorize bindings for embeddings storage
-[[vectorize]]
-binding = "APOD_SMALL_384D_VECTORIZE"
-index_name = "apod_small_384d"
-
 [[vectorize]]
 binding = "APOD_BASE_768D_VECTORIZE"
 index_name = "apod_base_768d"
 
-
-[[vectorize]]
-binding = "APOD_LARGE_1024D_VECTORIZE"
-index_name = "apod_large_1024d"
-
-
-[[vectorize]]
-binding = "APOD_M3_MULTI_VECTORIZE"
-index_name = "apod_m3_multi"
-
 [[vectorize]]
 binding = "APOD_IMAGE_EMBEDDINGS_VECTORIZE"
 index_name = "apod_img_embeddings"
-# CLIP models typically output 512-dimensional embeddings
-# You might need to adjust this based on the specific CLIP model used
-dimensions = 512
 
 # Environment variables
 [vars]

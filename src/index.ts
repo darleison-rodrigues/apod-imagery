@@ -10,12 +10,17 @@ async function processAPODRecord(apodRecord: APODMetadata, env: Env): Promise<vo
         try {
             const imageResponse = await fetch(apodRecord.image_url);
             const imageArrayBuffer = await imageResponse.arrayBuffer();
-
+			const analysisPrompt = [
+				'Analyze this astronomical image in detail.',
+				'Identify celestial objects, cosmic phenomena, and structural features.',
+				'Describe colors, brightness patterns, and spatial relationships.',
+				'Note any telescopic or observational characteristics visible.',
+			].join(' ');
             const llavaResponse = await env.AI.run(
                 "@cf/llava-hf/llava-1.5-7b-hf",
                 {
                     image: [...new Uint8Array(imageArrayBuffer)],
-                    prompt: "Describe this image in detail.",
+                    prompt: analysisPrompt,
                 }
             );
             
@@ -35,18 +40,11 @@ async function processAPODRecord(apodRecord: APODMetadata, env: Env): Promise<vo
         { text: textToEmbed }
     );
 
-    // Handle different possible response structures
-    let embeddings;
-    if (embeddingsResponse.data && Array.isArray(embeddingsResponse.data)) {
-        embeddings = embeddingsResponse.data[0];
-    } else if (embeddingsResponse.result && embeddingsResponse.result.data) {
-        embeddings = embeddingsResponse.result.data[0];
-    } else {
-        throw new Error(`Unexpected embeddings response structure: ${JSON.stringify(embeddingsResponse)}`);
-    }
+    // Handle embeddings response
+    const embeddings = embeddingsResponse.data?.[0];
 
-    if (!embeddings || !Array.isArray(embeddings)) {
-        throw new Error(`Invalid embeddings format: ${JSON.stringify(embeddings)}`);
+    if (!Array.isArray(embeddings)) {
+        throw new Error(`Unexpected or invalid embeddings response structure: ${JSON.stringify(embeddingsResponse)}`);
     }
 
     console.log(`Generated embeddings with ${embeddings.length} dimensions for ${apodRecord.date}`);
@@ -91,7 +89,7 @@ async function handleProcessing(env: Env): Promise<Response> {
 
         // Find the latest unprocessed APOD entry
         const { results } = await env.APOD_D1
-                .prepare("SELECT * FROM APODMetadata WHERE processed_at IS NULL ORDER BY date DESC LIMIT 1")
+                .prepare("SELECT * FROM apod_metadata_dev ORDER BY date DESC LIMIT 1")
                 .all<APODMetadata>();
 
         if (results && results.length > 0) {
