@@ -70,16 +70,18 @@ async function processAPODRecord(apodRecord: APODMetadata, env: Env): Promise<vo
     console.log(`Pooling method: ${embeddingsResponse.pooling || 'not provided'}`);
 
     // Step 3: Upsert embeddings into Vectorize index
-    await env.APOD_BASE_768D_VECTORIZE.upsert({
-        id: apodRecord.date,
-        values: embeddings,
-        metadata: {
-            date: apodRecord.date,
-            title: apodRecord.title,
-            category: apodRecord.category,
-            confidence: apodRecord.confidence,
-        },
-    });
+    await env.APOD_BASE_768D_VECTORIZE.upsert([
+        {
+            id: apodRecord.date,
+            values: embeddings,
+            metadata: {
+                date: apodRecord.date,
+                title: apodRecord.title,
+                category: apodRecord.category,
+                confidence: apodRecord.confidence,
+            },
+        }
+    ])
 
     console.log(`Text embeddings upserted for APOD date: ${apodRecord.date}`);
 
