@@ -2,6 +2,7 @@
  * Cloudflare Workers Environment bindings and configuration
  */
 export interface Env {
+    APOD_BASE_768D_VECTORIZE: any;
 	/** Cloudflare AI binding for ML model access */
 	AI: Ai;
 	/** Vectorize index for embeddings storage and similarity search */
@@ -10,6 +11,10 @@ export interface Env {
 	APOD_R2: R2Bucket;
 	/** D1 database for metadata storage */
 	APOD_D1: D1Database;
+	/** Durable Object for the Vectorize Workflow */
+	VECTORIZE_WORKFLOW: DurableObjectNamespace;
+	/** Vectorize index for image embeddings */
+	APOD_IMAGE_EMBEDDINGS_VECTORIZE: VectorizeIndex;
 	
 	// Configuration environment variables
 	/** Maximum number of concurrent processing operations */
@@ -138,6 +143,13 @@ export interface ProcessingConfig {
 	batchDelayMs: number;
 	/** Maximum total processing time in milliseconds */
 	maxProcessingTimeMs: number;
+}
+
+/**
+ * Payload for the Vectorize Workflow Durable Object.
+ */
+export interface VectorizeWorkflowPayload {
+    apodRecord: APODMetadata;
 }
 
 /**
@@ -360,3 +372,5 @@ export class EnhancedRateLimiter {
 		await new Promise(resolve => setTimeout(resolve, delay));
 	}
 }
+
+
